@@ -238,11 +238,25 @@ const State = {
 
   load() {
     const saved = Store.get('activeRound');
-    if (saved) { this.round = saved.round; this.holeIdx = saved.holeIdx; }
+    if (saved) {
+      this.round = saved.round;
+      this.holeIdx = saved.holeIdx;
+      // Restore the in-progress shot so backgrounding/reloading mid-hole doesn't
+      // lose the current shot (which would make tracking appear to get stuck).
+      this.shotStart = saved.shotStart ?? null;
+      this.pendingShot = saved.pendingShot ?? false;
+      this.currentClub = saved.currentClub ?? null;
+    }
   },
 
   saveActive() {
-    if (this.round) Store.set('activeRound', { round: this.round, holeIdx: this.holeIdx });
+    if (this.round) Store.set('activeRound', {
+      round: this.round,
+      holeIdx: this.holeIdx,
+      shotStart: this.shotStart,
+      pendingShot: this.pendingShot,
+      currentClub: this.currentClub
+    });
     else Store.del('activeRound');
   },
 
@@ -415,6 +429,7 @@ const State = {
     if (!GPS.pos) return false;
     this.shotStart = { lat: GPS.pos.lat, lon: GPS.pos.lon, club: this.currentClub };
     this.pendingShot = true;
+    this.saveActive();
     return true;
   },
 
@@ -1365,6 +1380,12 @@ const App = {
     if (!GPS.pos || (GPS.pos.acc && GPS.pos.acc > 30)) return; // need a decent fix
     const nextTee = State.course?.holes[State.holeIdx + 1]?.tee;
     if (!nextTee) return;
+    // If the next tee sits essentially on top of this hole's green (some course
+    // coordinates loop each green into the next tee), GPS can't tell "on the
+    // green" from "at the next tee" — so auto-advance would fire mid-hole as you
+    // approach the green. Skip it; use the "Made It!" button to finish the hole.
+    const pin = State.holeData?.pin;
+    if (pin && haversineYards(pin.lat, pin.lon, nextTee.lat, nextTee.lon) < 60) return;
     const dToNext = GPS.distanceTo(nextTee.lat, nextTee.lon);
     if (dToNext == null || dToNext > 35) {
       // moved away from the next tee — re-arm so a future arrival can trigger
@@ -1468,6 +1489,8 @@ const App = {
     if (!State.pendingShot && GPS.pos) {
       State.startShot();
       UI.toast(`${State.clubs.find(c => c.id === id)?.name} — Shot ${(State.hole?.shots.length || 0) + 1} started`, 'info', 1500);
+    } else {
+      State.saveActive(); // persist the club chosen for the next shot
     }
     UI.renderHole();
   },
