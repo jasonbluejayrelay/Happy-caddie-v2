@@ -41,6 +41,16 @@ jobs:
       - name: Sync web assets into Android project
         run: npx cap sync android
 
+      - name: Use a stable debug signing key
+        # Gradle's debug signingConfig signs with ~/.android/debug.keystore, which
+        # is normally auto-generated per machine — so every CI build would sign the
+        # APK with a different key and Android refuses to update an installed app
+        # ("App not installed"). Ship a fixed debug keystore so every build signs
+        # identically and updates install over each other.
+        run: |
+          mkdir -p ~/.android
+          cp keystore/debug.keystore ~/.android/debug.keystore
+
       - name: Build debug APK
         run: |
           cd android
