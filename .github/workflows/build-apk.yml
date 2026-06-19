@@ -2,11 +2,11 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ main ]
-  workflow_dispatch:   # lets you trigger a build manually from the Actions tab
+    branches: [ '**' ]
+  workflow_dispatch:
 
 permissions:
-  contents: write       # needed to publish the APK as a Release
+  contents: write
 
 jobs:
   build:
@@ -55,8 +55,10 @@ jobs:
         with:
           name: golf-tracker-apk
           path: golf-tracker.apk
+          retention-days: 7
 
-      - name: Publish APK to a Release (easy phone download)
+      - name: Publish APK to Release
+        if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
