@@ -18,6 +18,12 @@ function bearingDeg(lat1, lon1, lat2, lon2) {
   return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
 }
 
+// Smallest absolute difference between two compass bearings (0–180°).
+function angleDiff(a, b) {
+  const d = Math.abs(a - b) % 360;
+  return d > 180 ? 360 - d : d;
+}
+
 // Move a point `yards` along `bearing` (deg). Used to derive green front/back from center.
 function destinationPoint(lat, lon, bearing, yards) {
   const R = 6371000;
@@ -68,6 +74,41 @@ const GPS = {
   bearingTo(lat, lon) {
     if (!this.pos) return null;
     return bearingDeg(this.pos.lat, this.pos.lon, lat, lon);
+  }
+};
+
+// ─── Compass (device heading, for the rangefinder reticle) ─────────────────
+const Compass = {
+  heading: null,      // degrees, 0 = true north, increasing clockwise
+  _hasAbsolute: false,
+  _started: false,
+
+  async start() {
+    if (this._started) return;
+    this._started = true;
+    // iOS 13+ gates orientation behind a permission prompt that must be
+    // triggered from a user gesture (we call this from the rangefinder tap).
+    try {
+      const DOE = window.DeviceOrientationEvent;
+      if (DOE && typeof DOE.requestPermission === 'function') {
+        const res = await DOE.requestPermission().catch(() => 'denied');
+        if (res !== 'granted') { this._started = false; return; }
+      }
+    } catch {}
+    window.addEventListener('deviceorientationabsolute', e => { this._hasAbsolute = true; this._read(e); }, true);
+    window.addEventListener('deviceorientation', e => {
+      // Prefer the absolute feed on Android; only use this for iOS' webkit heading.
+      if (this._hasAbsolute && e.webkitCompassHeading == null) return;
+      this._read(e);
+    }, true);
+  },
+
+  _read(e) {
+    if (e.webkitCompassHeading != null) {
+      this.heading = e.webkitCompassHeading;          // iOS: already true heading (CW)
+    } else if (e.alpha != null) {
+      this.heading = (360 - e.alpha) % 360;           // absolute alpha → compass heading
+    }
   }
 };
 
@@ -125,9 +166,21 @@ const Voice = {
     return true;
   },
 
+  // Speech engines routinely mishear "golf" as "gulf"/"gold", so accept close
+  // homophones and a couple of natural prefixes as the wake word.
+  WAKE: /\b(?:golf|gulf|gold|caddie|caddy)\b/i,
+  WAKE_G: /\b(?:golf|gulf|gold|caddie|caddy)\b/gi,
+
   listen() {
     if (!this.recog || this.active) return;
-    try { this.recog.start(); this.active = true; UI.setVoiceStatus(true); } catch {}
+    try {
+      // In always-on mode keep the mic open so the wake word isn't lost during
+      // the stop/restart gap; push-to-talk grabs a single phrase.
+      this.recog.continuous = this.continuous;
+      this.recog.start();
+      this.active = true;
+      UI.setVoiceStatus(true);
+    } catch {}
   },
 
   stop() { this.continuous = false; if (this.recog && this.active) { try { this.recog.stop(); } catch {} } },
@@ -139,19 +192,32 @@ const Voice = {
   },
 
   _handle(alts) {
-    const text = alts[0];
-    // Wake word check in continuous mode
-    if (this.continuous) {
-      const hasWake = alts.some(a => /\bgolf\b/.test(a));
-      if (!hasWake && !alts.some(a => this._isCommand(a))) return;
+    const hasWake = alts.some(a => this.WAKE.test(a));
+    const looksLikeCmd = alts.some(a => this._isCommand(a));
+
+    // In always-on mode, ignore background speech that is neither the wake word
+    // nor a recognizable command.
+    if (this.continuous && !hasWake && !looksLikeCmd) return;
+
+    // Prefer the alternative that actually carries the wake word or a command.
+    const text = alts.find(a => this.WAKE.test(a) || this._isCommand(a)) || alts[0];
+    const cmd = text.replace(this.WAKE_G, ' ').replace(/\s+/g, ' ').trim();
+
+    // Wake word heard with nothing after it — acknowledge so the user knows it
+    // registered (the only signal you get when not looking at the phone).
+    if (hasWake && !cmd) {
+      UI.toast('Listening… say a command', 'info', 1500);
+      Speak.say('Go ahead');
+      return;
     }
-    // Strip wake word and parse command
-    const cmd = text.replace(/\bgolf\b/gi, '').trim() || text;
-    if (this.onCommand) this.onCommand(cmd, alts);
+
+    // Otherwise hand the full phrase to the command parser, which knows the
+    // complete vocabulary.
+    if (this.onCommand) this.onCommand(cmd || text, alts);
   },
 
   _isCommand(t) {
-    return /next shot|new shot|made it|in the hole|holed out|score \d|par|bogey|birdie|eagle|club |driver|iron|wood|hybrid|wedge|putter/.test(t);
+    return /next shot|new shot|made it|in the hole|holed out|score \d|par|bogey|birdie|eagle|double|triple|club |driver|iron|wood|hybrid|wedge|putter|yardage|how far|distance|rangefinder|camera|scorecard|the card|match|standings|winning|commands|what can i say|help/.test(t);
   }
 };
 
@@ -221,6 +287,19 @@ const State = {
       label: `Lay up to ${y}`,
       point: destinationPoint(hd.pin.lat, hd.pin.lon, (b + 180) % 360, y)
     }));
+  },
+
+  // Aim-able points for the rangefinder reticle. The green's front/center/back
+  // sit on your line of play (same bearing), so they can't be told apart by aim
+  // — the green is a single "Pin" target. Off-axis points (carries, hazards,
+  // layups) get their own entries so panning the phone can lock onto them.
+  rangefinderTargets() {
+    const targets = [];
+    const hd = this.holeData;
+    if (hd) targets.push({ label: 'Pin', point: { lat: hd.pin.lat, lon: hd.pin.lon }, primary: true });
+    for (const c of this.carryTargets()) targets.push({ label: c.label, point: c.point });
+    for (const l of this.layupTargets()) targets.push({ label: l.label, point: l.point });
+    return targets;
   },
 
   // ── Shot editing (keeps club averages correct) ──────────────────────────
@@ -964,9 +1043,15 @@ const UI = {
   },
 
   // ── Rangefinder ────────────────────────────────────────────────────────
+  // Point the phone like a laser rangefinder: a center reticle locks onto the
+  // mapped target (pin, green front/back, carries, layups) you're aiming at and
+  // reads out its distance. Falls back to the pin when no compass is available.
+  _rfLockedTarget: null,
+
   async openRangefinder() {
     this.$('rangefinder-overlay').style.display = 'flex';
     this.rangefinderOpen = true;
+    Compass.start(); // user gesture → ok to request orientation permission on iOS
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       this.cameraStream = stream;
@@ -981,24 +1066,65 @@ const UI = {
 
   closeRangefinder() {
     this.rangefinderOpen = false;
+    this._rfLockedTarget = null;
     this.$('rangefinder-overlay').style.display = 'none';
     if (this.cameraStream) { this.cameraStream.getTracks().forEach(t => t.stop()); this.cameraStream = null; }
   },
 
+  // Speak the locked target's distance (rangefinder "trigger").
+  rangefinderShoot() {
+    const t = this._rfLockedTarget;
+    if (!t) { Speak.say('No target'); UI.toast('Aim at a target first', 'error'); return; }
+    UI.toast(`${t.label}: ${t.dist} yds`, 'success', 2500);
+    Speak.say(`${t.dist} yards to ${t.label}`);
+  },
+
   updateRangefinder() {
     if (!this.rangefinderOpen) return;
-    const hd = State.holeData;
-    const el = this.$('rf-distance');
+    const overlay = this.$('rangefinder-overlay');
+    const distEl = this.$('rf-distance');
+    const labelEl = this.$('rf-label');
     const bearEl = this.$('rf-bearing');
-    if (hd && GPS.pos) {
-      const dist = Math.round(GPS.distanceTo(hd.pin.lat, hd.pin.lon));
-      const bear = Math.round(GPS.bearingTo(hd.pin.lat, hd.pin.lon));
-      el.textContent = dist + ' yds';
-      const compass = ['N','NE','E','SE','S','SW','W','NW'][Math.round(bear / 45) % 8];
-      bearEl.textContent = `${bear}° ${compass}`;
+    const targets = State.rangefinderTargets();
+    const aim = Compass.heading;
+
+    if (GPS.pos && targets.length) {
+      // Range every mapped point from the current position…
+      for (const t of targets) {
+        t.dist = Math.round(GPS.distanceTo(t.point.lat, t.point.lon));
+        t.bearing = GPS.bearingTo(t.point.lat, t.point.lon);
+      }
+      // Default to the pin, then let the reticle steal the lock only when it is
+      // pointing clearly closer to another (off-axis) target — this keeps
+      // near-collinear targets from flickering.
+      let pick = targets.find(t => t.primary) || targets[0];
+      let bestDiff = aim != null ? angleDiff(aim, pick.bearing) : 0;
+      if (aim != null) {
+        for (const t of targets) {
+          const diff = angleDiff(aim, t.bearing);
+          if (diff < bestDiff - 2) { bestDiff = diff; pick = t; }
+        }
+      }
+      const locked = aim != null && bestDiff <= 12;
+      this._rfLockedTarget = pick;
+      overlay.classList.toggle('rf-locked', locked);
+
+      distEl.textContent = pick.dist + ' yds';
+      labelEl.textContent = pick.label.toUpperCase();
+      if (aim != null) {
+        const compass = ['N','NE','E','SE','S','SW','W','NW'][Math.round(aim / 45) % 8];
+        bearEl.textContent = locked
+          ? `🔒 Locked · ${Math.round(aim)}° ${compass}`
+          : `Pan to a target · ${Math.round(aim)}° ${compass}`;
+      } else {
+        bearEl.textContent = 'Compass unavailable — showing the pin';
+      }
     } else {
-      el.textContent = '— yds';
-      bearEl.textContent = 'No GPS';
+      this._rfLockedTarget = null;
+      overlay.classList.remove('rf-locked');
+      distEl.textContent = '— yds';
+      labelEl.textContent = 'TO TARGET';
+      bearEl.textContent = GPS.pos ? 'No targets mapped on this hole' : 'Acquiring GPS…';
     }
     if (this.rangefinderOpen) requestAnimationFrame(() => this.updateRangefinder());
   },
@@ -1214,12 +1340,10 @@ const App = {
       navigator.serviceWorker.register('./sw.js').catch(() => {});
     }
 
-    // Device compass
-    if (window.DeviceOrientationEvent) {
-      window.addEventListener('deviceorientationabsolute', e => {
-        UI.compassHeading = e.alpha;
-      });
-    }
+    // Device compass — start now where allowed (Android); iOS waits for the
+    // rangefinder tap so it can prompt for permission from a user gesture.
+    const DOE = window.DeviceOrientationEvent;
+    if (DOE && typeof DOE.requestPermission !== 'function') Compass.start();
 
     UI.renderHome();
     UI.showView('home');
@@ -1379,6 +1503,8 @@ const App = {
 
     if (/next shot|new shot/.test(t)) { App.newShot(); return; }
     if (/made it|in the hole|holed out/.test(t)) { App.madeIt(); return; }
+    // While the rangefinder is open, "range/shoot/lock" reads the aimed target.
+    if (UI.rangefinderOpen && /\b(range|shoot|fire|lock)\b/.test(t)) { UI.rangefinderShoot(); return; }
     if (/yardage|how far|distance to (the )?pin|read distance/.test(t)) { App.speakYardage(); return; }
     if (/commands|what can i say|^help|show help/.test(t)) { App.goHelp(); Speak.say('Here are all the commands'); return; }
     if (/rangefinder|camera/.test(t)) { UI.openRangefinder(); return; }
