@@ -425,6 +425,14 @@ const State = {
     return dist;
   },
 
+  // Yards moved since the in-progress shot started (null if none / no GPS).
+  pendingDistance() {
+    if (!this.shotStart || !GPS.pos) return null;
+    return Math.round(haversineYards(
+      this.shotStart.lat, this.shotStart.lon, GPS.pos.lat, GPS.pos.lon
+    ));
+  },
+
   startShot() {
     if (!GPS.pos) return false;
     this.shotStart = { lat: GPS.pos.lat, lon: GPS.pos.lon, club: this.currentClub };
@@ -1499,9 +1507,17 @@ const App = {
     if (!State.round) return;
     if (!GPS.pos) { UI.toast('Waiting for GPS…', 'error'); return; }
     if (State.pendingShot) {
+      // A shot only counts once you've walked to the ball (≥5 yds). If you tap
+      // again without moving, tell you how far you've gone and keep the shot
+      // pending — don't silently reset it (that's what looked like "stuck").
+      const moved = State.pendingDistance();
+      if (moved != null && moved < 5) {
+        UI.toast(`Only ${moved} yd from the last shot — walk to your ball, then tap New Shot`, 'info', 3000);
+        return;
+      }
       const dist = State.nextShot(State.currentClub);
       if (dist > 0) { UI.toast(`Shot recorded: ${dist} yds`, 'success', 2000); Speak.say(`Shot recorded, ${dist} yards`); }
-      else UI.toast('Started new shot', 'info', 1500);
+      else UI.toast('New shot started', 'info', 1500);
     } else {
       if (!State.currentClub) { UI.toast('Select a club first', 'error'); return; }
       State.startShot();
