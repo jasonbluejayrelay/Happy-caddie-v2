@@ -1,0 +1,11 @@
+{
+  "appId": "com.jason.golftracker",
+  "appName": "Golf Tracker",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

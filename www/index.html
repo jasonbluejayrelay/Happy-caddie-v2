@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1a4a2e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Golf Tracker</title>
+<link rel="manifest" href="./manifest.json">
+<style>
+:root {
+  --bg:       #0a2114;
+  --bg2:      #0d2a1a;
+  --card:     #143020;
+  --card2:    #1b4029;
+  --border:   #2c5e3d;
+  --green:    #2e7d4f;
+  --accent:   #57c98a;
+  --accent2:  #7fe3a8;
+  --text:     #eaf6ee;
+  --muted:    #82bd97;
+  --danger:   #e85d5d;
+  --warning:  #f0a830;
+  --gold:     #f5c518;
+  --radius:   14px;
+  --shadow:    0 6px 18px rgba(0,0,0,0.38);
+  --shadow-sm: 0 2px 8px rgba(0,0,0,0.28);
+  --grad-accent: linear-gradient(135deg, #57c98a 0%, #2e7d4f 100%);
+  --grad-green:  linear-gradient(135deg, #2e7d4f 0%, #1c5634 100%);
+  --grad-head:   linear-gradient(160deg, #17402a 0%, #0d2a1a 100%);
+  --grad-bg:     radial-gradient(120% 80% at 50% 0%, #143a24 0%, #0a2114 60%);
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bot: env(safe-area-inset-bottom, 0px);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%; background: var(--bg); background-image: var(--grad-bg); color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden; user-select: none; -webkit-font-smoothing: antialiased;
+}
+
+/* ── Layout ───────────────────────────────────── */
+.view {
+  display: flex; flex-direction: column; height: 100vh; height: 100dvh;
+  padding-top: var(--safe-top);
+}
+
+.top-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px; background-image: var(--grad-head);
+  border-bottom: 1px solid var(--border); box-shadow: var(--shadow-sm);
+  min-height: 54px; flex-shrink: 0; z-index: 5;
+}
+.top-bar h1 { font-size: 18px; font-weight: 800; letter-spacing: 0.3px; color: var(--text); }
+.top-back { background: none; border: none; color: var(--accent); font-size: 24px; cursor: pointer; padding: 4px 8px; }
+
+.scroll-area { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.pad { padding: 16px; }
+
+/* ── Cards ────────────────────────────────────── */
+.card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px; margin-bottom: 12px;
+  box-shadow: var(--shadow-sm);
+}
+.card-title { font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--accent); margin-bottom: 10px; font-weight: 700; }
+
+/* ── Buttons ──────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  border: none; border-radius: var(--radius); cursor: pointer;
+  font-size: 16px; font-weight: 700; padding: 14px 20px; letter-spacing: 0.2px;
+  transition: filter 0.15s, transform 0.08s, box-shadow 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn:active { transform: scale(0.97); filter: brightness(0.9); }
+.btn-primary  { background-image: var(--grad-green); color: #fff; box-shadow: var(--shadow-sm); }
+.btn-accent   { background-image: var(--grad-accent); color: #06200f; box-shadow: 0 4px 14px rgba(87,201,138,0.3); }
+.btn-danger   { background: var(--danger); color: #fff; }
+.btn-ghost    { background: rgba(255,255,255,0.04); border: 1px solid var(--border); color: var(--text); }
+.btn-sm       { font-size: 13px; padding: 8px 13px; border-radius: 10px; }
+.btn-block    { width: 100%; margin-bottom: 11px; }
+.btn-icon     { font-size: 22px; padding: 10px 14px; }
+
+/* ── HOME ─────────────────────────────────────── */
+#view-home .scroll-area { display: flex; flex-direction: column; }
+.home-logo { text-align: center; padding: 40px 16px 24px; }
+.home-logo .logo-icon {
+  font-size: 60px; display: inline-flex; align-items: center; justify-content: center;
+  width: 104px; height: 104px; border-radius: 28px; background-image: var(--grad-green);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,0.15); margin-bottom: 14px;
+}
+.home-logo h2 {
+  font-size: 30px; font-weight: 900; letter-spacing: 0.3px; margin-top: 4px;
+  background-image: linear-gradient(120deg, var(--accent2), var(--accent));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.home-logo p  { color: var(--muted); font-size: 14px; margin-top: 6px; letter-spacing: 0.3px; }
+
+/* ── Course card ──────────────────────────────── */
+.course-card { background-image: linear-gradient(160deg, var(--card2), var(--card)); }
+.course-card-name { font-size: 16px; font-weight: 800; }
+.course-card-meta { font-size: 12px; color: var(--accent); margin: 2px 0 10px; }
+.course-card-row { font-size: 13px; color: var(--muted); line-height: 1.7; }
+
+/* ── Help / commands ──────────────────────────── */
+.help-intro { font-size: 13px; color: var(--muted); line-height: 1.6; margin-bottom: 12px; }
+.cmd { display: flex; flex-direction: column; gap: 2px; padding: 8px 0; border-top: 1px solid var(--border); }
+.cmd:first-of-type { border-top: none; }
+.cmd-say { font-size: 14px; font-weight: 700; color: var(--accent); }
+.cmd-do  { font-size: 12px; color: var(--muted); }
+.active-banner {
+  display: flex; align-items: center; justify-content: space-between;
+  background-image: var(--grad-accent); color: #06200f; font-weight: 700;
+  border-radius: var(--radius); padding: 15px 18px; margin: 0 16px 12px;
+  cursor: pointer; box-shadow: 0 4px 16px rgba(87,201,138,0.3);
+}
+.active-banner .btn-sm { background: rgba(0,0,0,0.18); padding: 6px 10px; border-radius: 8px; }
+
+/* ── ROUND SETUP ──────────────────────────────── */
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+.form-group input, .form-group select {
+  width: 100%; background: var(--card2); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text); font-size: 16px; padding: 11px 12px;
+  outline: none;
+}
+.form-group input:focus, .form-group select:focus { border-color: var(--accent); }
+.player-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.player-assign { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.player-assign input {
+  flex: 1; background: var(--card2); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text); font-size: 16px; padding: 11px 12px; outline: none;
+}
+.player-assign input:focus { border-color: var(--accent); }
+.team-toggle { display: flex; flex-shrink: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.tt-opt {
+  background: var(--card2); border: none; color: var(--muted);
+  font-size: 14px; font-weight: 700; padding: 11px 14px; cursor: pointer; transition: background 0.15s;
+}
+.tt-opt.tt-on { background: var(--green); color: #fff; }
+
+/* ── ROUND VIEW ───────────────────────────────── */
+#view-round { padding-top: var(--safe-top); }
+.tab-bar {
+  display: flex; background: var(--bg2);
+  border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.tab-btn {
+  flex: 1; border: none; background: none; color: var(--muted); font-weight: 600;
+  font-size: 13px; padding: 13px 2px; cursor: pointer; border-bottom: 3px solid transparent;
+  transition: color 0.15s;
+}
+.tab-btn.tab-active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(87,201,138,0.06); }
+
+/* ── HOLE TAB ─────────────────────────────────── */
+.hole-header {
+  background-image: var(--grad-head); padding: 13px 16px;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  border-bottom: 1px solid var(--border);
+}
+.hole-badge {
+  background-image: var(--grad-green); border-radius: 10px; padding: 5px 14px;
+  font-size: 18px; font-weight: 900; box-shadow: var(--shadow-sm); color: #fff;
+}
+.hole-meta { display: flex; gap: 8px; color: var(--muted); font-size: 14px; }
+.hole-meta span { background: var(--card2); border-radius: 6px; padding: 3px 8px; }
+.hole-desc { font-size: 12px; color: var(--muted); margin-top: 4px; width: 100%; }
+
+.pin-section {
+  background: linear-gradient(180deg, var(--card) 0%, var(--bg2) 100%); padding: 16px;
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+}
+.green-dists { display: flex; align-items: flex-end; gap: 16px; }
+.gd { display: flex; flex-direction: column; align-items: center; }
+.gd span { font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; color: var(--muted); }
+.gd label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin-top: 3px; }
+.gd-center span { font-size: 48px; font-weight: 900; color: var(--accent); text-shadow: 0 0 22px rgba(87,201,138,0.35); }
+.gd-center label { color: var(--text); }
+.gps-acc    { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+.shot-status-bar {
+  background: var(--card2); padding: 8px 16px;
+  font-size: 13px; color: var(--muted); border-bottom: 1px solid var(--border);
+}
+
+.club-suggestion {
+  padding: 8px 16px; font-size: 13px; color: var(--muted);
+  background: var(--bg); border-bottom: 1px solid var(--border);
+  min-height: 34px;
+}
+.sug { cursor: pointer; padding: 2px 6px; border-radius: 4px; }
+.sug-best { color: var(--accent); font-weight: 700; background: rgba(76,175,120,0.12); }
+
+/* ── Club Selector ────────────────────────────── */
+.club-section { padding: 10px 16px 4px; flex-shrink: 0; }
+.club-section-label { font-size: 11px; text-transform: uppercase; color: var(--muted); letter-spacing: 0.5px; margin-bottom: 6px; }
+#club-selector {
+  display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px;
+  -webkit-overflow-scrolling: touch; scrollbar-width: none;
+}
+#club-selector::-webkit-scrollbar { display: none; }
+.club-btn {
+  flex-shrink: 0; min-width: 64px; background: var(--card); border: 1px solid var(--border);
+  border-radius: 10px; padding: 8px 10px; text-align: center; cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.club-btn:active { background: var(--card2); }
+.club-sel { background-image: var(--grad-green); border-color: var(--accent); box-shadow: 0 2px 10px rgba(87,201,138,0.25); }
+.club-sel .club-name { color: #fff; }
+.club-name { font-size: 13px; font-weight: 600; }
+.club-avg  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.club-sel .club-avg { color: rgba(255,255,255,0.7); }
+
+/* ── Shot Log ─────────────────────────────────── */
+.shot-log-section { padding: 8px 16px 4px; }
+.shot-log-label { font-size: 11px; text-transform: uppercase; color: var(--muted); letter-spacing: 0.5px; margin-bottom: 6px; }
+#shot-log { max-height: 120px; overflow-y: auto; }
+.shot-item {
+  display: flex; align-items: center; gap: 10px; padding: 6px 8px;
+  background: var(--card2); border-radius: 8px; margin-bottom: 4px;
+  font-size: 14px;
+}
+.shot-num  { background: var(--border); border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+.shot-club { flex: 1; color: var(--muted); }
+.shot-dist { font-weight: 700; color: var(--accent); }
+.shot-edit { color: var(--muted); font-size: 13px; padding-left: 4px; }
+.shot-item { cursor: pointer; }
+.no-shots  { color: var(--muted); font-size: 13px; text-align: center; padding: 10px; }
+
+/* ── Hazards & layups ─────────────────────────── */
+.hazard-section { padding: 6px 16px; border-bottom: 1px solid var(--border); background: var(--bg); }
+.hazard-head { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin-bottom: 4px; }
+.haz-item { display: inline-flex; align-items: center; gap: 6px; background: var(--card2); border-radius: 6px;
+  padding: 4px 8px; margin: 0 6px 4px 0; font-size: 12px; }
+.haz-d { font-weight: 700; color: var(--warning); }
+.haz-hint { font-size: 12px; color: var(--muted); }
+
+/* ── Handicap input ───────────────────────────── */
+.hcp-input { width: 58px; flex-shrink: 0; background: var(--card2); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text); font-size: 15px; padding: 11px 8px; outline: none; text-align: center; }
+.hcp-input:focus { border-color: var(--accent); }
+
+/* ── Match table ──────────────────────────────── */
+.match-lead { font-size: 18px; font-weight: 800; color: var(--accent); text-align: center; }
+.match-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.match-table th, .match-table td { border-bottom: 1px solid var(--border); padding: 8px 4px; text-align: center; }
+.match-table th { color: var(--muted); font-size: 11px; text-transform: uppercase; }
+.match-net { font-weight: 800; color: var(--accent); }
+
+/* ── Toggle row ───────────────────────────────── */
+.toggle-row { display: flex; align-items: center; justify-content: space-between; font-size: 15px; padding: 4px 0; }
+.toggle-row input { width: 22px; height: 22px; accent-color: var(--accent); }
+
+/* ── Action Buttons ───────────────────────────── */
+.action-bar {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  padding: 12px 16px calc(12px + var(--safe-bot));
+  background-image: var(--grad-head); border-top: 1px solid var(--border);
+  box-shadow: 0 -4px 16px rgba(0,0,0,0.25); flex-shrink: 0;
+}
+.action-bar .btn-voice-row {
+  grid-column: 1 / -1; display: grid; grid-template-columns: 1fr auto auto;
+  gap: 8px;
+}
+.voice-active { background: var(--danger) !important; animation: pulse-red 1s infinite; }
+@keyframes pulse-red { 0%,100%{opacity:1} 50%{opacity:0.7} }
+
+/* ── SCORECARD ────────────────────────────────── */
+#tab-scorecard { overflow-x: auto; }
+.scorecard { width: 100%; border-collapse: collapse; font-size: 13px; }
+.scorecard th, .scorecard td {
+  border: 1px solid var(--border); padding: 6px 4px; text-align: center; white-space: nowrap;
+}
+.scorecard thead { background: var(--card); position: sticky; top: 0; z-index: 1; }
+.scorecard thead th { color: var(--muted); font-size: 11px; }
+.team-hdr  { background: rgba(76,175,120,0.1); color: var(--accent) !important; }
+.team-score { background: rgba(76,175,120,0.06); }
+.current-hole-row { background: rgba(76,175,120,0.08); }
+.subtotal-row { background: var(--card2); font-weight: 700; }
+.total-row    { background: var(--card);  font-weight: 800; color: var(--accent); }
+
+/* Score colors */
+.score-eagle  { background: #1a5c2e; color: #7dff9d; font-weight: 800; }
+.score-birdie { background: #1a4a2e; color: #4cff7c; font-weight: 700; }
+.score-par    { background: transparent; }
+.score-bogey  { background: #3a2010; color: var(--warning); }
+.score-dbl    { background: #3a1010; color: var(--danger); }
+
+/* ── STATS ────────────────────────────────────── */
+.stat-row { margin-bottom: 14px; }
+.stat-club { font-size: 15px; font-weight: 700; margin-bottom: 3px; }
+.stat-avg  { font-size: 28px; font-weight: 900; color: var(--accent); line-height: 1; }
+.stat-avg small { font-size: 13px; font-weight: 400; color: var(--muted); margin-left: 4px; }
+.stat-range { font-size: 12px; color: var(--muted); margin: 2px 0 6px; }
+.stat-bar  { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.stat-fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.5s; }
+.suggest-box { margin-bottom: 16px; }
+.suggest-input { display: flex; gap: 8px; align-items: center; }
+.suggest-input input { flex: 1; background: var(--card2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 16px; padding: 10px 12px; outline: none; }
+.sug-result { margin-top: 10px; }
+.sug-row  { padding: 8px 10px; border-radius: 8px; margin-bottom: 6px; background: var(--card); font-size: 14px; }
+.sug-top  { background: var(--card2); border: 1px solid var(--accent); }
+.empty-state { text-align: center; color: var(--muted); padding: 32px 16px; line-height: 1.8; font-size: 15px; }
+
+/* ── HISTORY ──────────────────────────────────── */
+.trend-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.trend { background: var(--card2); border-radius: 8px; padding: 10px 6px; text-align: center; }
+.trend-val { font-size: 22px; font-weight: 800; color: var(--accent); line-height: 1; }
+.trend-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin-top: 4px; }
+.round-card { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 8px; }
+.round-main { display: flex; align-items: center; gap: 12px; }
+.round-score { font-size: 26px; font-weight: 900; color: var(--text); }
+.round-score small { font-size: 14px; color: var(--muted); font-weight: 600; }
+.round-meta { line-height: 1.4; }
+.round-date { font-size: 13px; font-weight: 600; }
+.round-course { font-size: 11px; color: var(--muted); }
+.round-stats { display: flex; flex-direction: column; gap: 2px; text-align: right; }
+.round-stats span { font-size: 11px; color: var(--muted); }
+
+/* ── MY BAG ───────────────────────────────────── */
+.bag-item { display: flex; align-items: center; gap: 10px; background: var(--card2);
+  border-radius: 8px; padding: 11px 12px; margin-bottom: 8px; }
+.bag-name { flex: 1; font-size: 15px; font-weight: 600; cursor: pointer; }
+.bag-avg { font-size: 12px; color: var(--muted); }
+.bag-del { background: none; border: none; color: var(--danger); font-size: 18px; cursor: pointer; padding: 0 4px; }
+.bag-add { display: flex; gap: 8px; margin-top: 4px; }
+.bag-add input { flex: 1; background: var(--card2); border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text); font-size: 16px; padding: 11px 12px; outline: none; }
+.bag-add input:focus { border-color: var(--accent); }
+
+/* ── SCORE MODAL ──────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.8);
+  display: none; align-items: flex-end; justify-content: center; z-index: 100;
+}
+.modal {
+  background: var(--card); border-radius: 16px 16px 0 0; width: 100%; max-width: 500px;
+  padding: 20px 20px calc(20px + var(--safe-bot));
+}
+.modal h3 { font-size: 18px; margin-bottom: 16px; color: var(--accent); }
+.score-entry { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.score-entry label { font-size: 16px; }
+.score-controls { display: flex; align-items: center; gap: 10px; }
+.score-controls button {
+  background: var(--card2); border: 1px solid var(--border); color: var(--text);
+  width: 36px; height: 36px; border-radius: 8px; font-size: 20px; cursor: pointer;
+}
+.score-controls input { width: 52px; text-align: center; background: var(--card2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 20px; font-weight: 700; padding: 6px; }
+
+/* ── RANGEFINDER ──────────────────────────────── */
+#rangefinder-overlay {
+  position: fixed; inset: 0; background: #000; display: none;
+  flex-direction: column; align-items: center; justify-content: center; z-index: 200;
+}
+#rf-video { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; }
+.rf-ui { position: relative; z-index: 10; text-align: center; }
+.rf-dist-box {
+  background: rgba(0,0,0,0.7); border: 2px solid var(--accent); border-radius: 16px;
+  padding: 20px 40px; margin-bottom: 20px;
+}
+#rf-distance { font-size: 72px; font-weight: 900; color: var(--accent); line-height: 1; }
+.rf-label { font-size: 14px; color: var(--muted); }
+#rf-bearing { font-size: 24px; font-weight: 700; color: #fff; margin-top: 8px; }
+#rf-no-cam { color: var(--warning); margin-bottom: 16px; display: none; text-align: center; }
+.rf-close { position: absolute; top: calc(16px + var(--safe-top)); right: 16px; z-index: 20; }
+
+/* ── TOAST ────────────────────────────────────── */
+#toast {
+  position: fixed; bottom: calc(90px + var(--safe-bot)); left: 50%; transform: translateX(-50%) translateY(20px);
+  background: var(--card2); border: 1px solid var(--border); border-radius: 20px;
+  padding: 10px 20px; font-size: 14px; font-weight: 500;
+  opacity: 0; transition: opacity 0.2s, transform 0.2s; pointer-events: none; z-index: 300;
+  white-space: nowrap; max-width: 90vw;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+#toast.toast-success { border-color: var(--accent); color: var(--accent); }
+#toast.toast-error   { border-color: var(--danger); color: var(--danger); }
+#toast.toast-info    { border-color: var(--muted); }
+
+/* ── Misc ─────────────────────────────────────── */
+.divider { height: 1px; background: var(--border); margin: 12px 0; }
+select option { background: var(--card); }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════ HOME ═══════════════════ -->
+<div id="view-home" class="view" style="display:none">
+  <div class="top-bar">
+    <h1>⛳ Golf Tracker</h1>
+    <button class="btn btn-ghost btn-sm" onclick="App.goSettings()">⚙</button>
+  </div>
+  <div class="scroll-area pad">
+    <div class="home-logo">
+      <div class="logo-icon">⛳</div>
+      <h2>Golf Tracker</h2>
+      <p>North Hampton Golf Club</p>
+    </div>
+
+    <div id="home-active-banner"></div>
+
+    <button class="btn btn-accent btn-block" onclick="App.goSetup()">🏌 Start New Round</button>
+    <button class="btn btn-primary btn-block" onclick="App.goStats()">📊 My Club Stats</button>
+    <button class="btn btn-primary btn-block" onclick="App.goHistory()">📜 Round History &amp; Trends</button>
+    <button class="btn btn-ghost btn-block" onclick="App.goHelp()">🎙 Commands &amp; Help</button>
+
+    <div class="card course-card">
+      <div class="course-card-name">North Hampton Golf Club</div>
+      <div class="course-card-meta">Fernandina Beach, FL · Par 72 · 6,690 yds</div>
+      <div class="course-card-row">📍 940287 Golf Club Dr</div>
+      <div class="course-card-row">📞 (904) 491-4104</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ SETUP ═══════════════════ -->
+<div id="view-setup" class="view" style="display:none">
+  <div class="top-bar">
+    <button class="top-back" onclick="App.goHome()">←</button>
+    <h1>New Round</h1>
+    <div></div>
+  </div>
+  <div class="scroll-area pad">
+    <div class="card">
+      <div class="card-title">Course</div>
+      <div style="font-size:15px;font-weight:700">North Hampton Golf Club</div>
+      <div style="font-size:13px;color:var(--muted)">Fernandina Beach, FL · Par 72</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Tee Box</div>
+      <div class="form-group">
+        <select id="setup-tee"></select>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Team Names</div>
+      <div class="player-row">
+        <div class="form-group">
+          <label>Team 1</label>
+          <input id="setup-team0" type="text" value="Team 1">
+        </div>
+        <div class="form-group">
+          <label>Team 2</label>
+          <input id="setup-team1" type="text" value="Team 2">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Players &amp; Team Assignment</div>
+      <div class="player-assign">
+        <input id="setup-player0" type="text" placeholder="Your name" value="Jason">
+        <input id="setup-hcp0" class="hcp-input" type="number" placeholder="Hcp">
+        <div class="team-toggle" id="teamtog-0" data-team="0">
+          <button type="button" class="tt-opt tt-on" onclick="UI.setPlayerTeam(0,0)">T1</button>
+          <button type="button" class="tt-opt" onclick="UI.setPlayerTeam(0,1)">T2</button>
+        </div>
+      </div>
+      <div class="player-assign">
+        <input id="setup-player1" type="text" placeholder="Player 2 (optional)">
+        <input id="setup-hcp1" class="hcp-input" type="number" placeholder="Hcp">
+        <div class="team-toggle" id="teamtog-1" data-team="1">
+          <button type="button" class="tt-opt" onclick="UI.setPlayerTeam(1,0)">T1</button>
+          <button type="button" class="tt-opt tt-on" onclick="UI.setPlayerTeam(1,1)">T2</button>
+        </div>
+      </div>
+      <div class="player-assign">
+        <input id="setup-player2" type="text" placeholder="Player 3 (optional)">
+        <input id="setup-hcp2" class="hcp-input" type="number" placeholder="Hcp">
+        <div class="team-toggle" id="teamtog-2" data-team="0">
+          <button type="button" class="tt-opt tt-on" onclick="UI.setPlayerTeam(2,0)">T1</button>
+          <button type="button" class="tt-opt" onclick="UI.setPlayerTeam(2,1)">T2</button>
+        </div>
+      </div>
+      <div class="player-assign">
+        <input id="setup-player3" type="text" placeholder="Player 4 (optional)">
+        <input id="setup-hcp3" class="hcp-input" type="number" placeholder="Hcp">
+        <div class="team-toggle" id="teamtog-3" data-team="1">
+          <button type="button" class="tt-opt" onclick="UI.setPlayerTeam(3,0)">T1</button>
+          <button type="button" class="tt-opt tt-on" onclick="UI.setPlayerTeam(3,1)">T2</button>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px">Tap T1/T2 to assign each player. Leave a name blank to skip. Hcp is optional (enables net best-ball &amp; skins).</div>
+    </div>
+
+    <button class="btn btn-accent btn-block" onclick="App.startRound()" style="margin-top:8px">
+      Start Round →
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════════ ROUND ═══════════════════ -->
+<div id="view-round" class="view" style="display:none">
+
+  <!-- Top bar -->
+  <div class="top-bar">
+    <button class="top-back" onclick="App.goHome()">←</button>
+    <h1 id="round-title">Round</h1>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-ghost btn-sm" onclick="App.goHelp()">?</button>
+      <button class="btn btn-ghost btn-sm" onclick="App.abandonRound()">✕</button>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tab-bar">
+    <button class="tab-btn tab-active" data-tab="hole"      onclick="UI.switchTab('hole')">⛳ Hole</button>
+    <button class="tab-btn"           data-tab="scorecard" onclick="UI.switchTab('scorecard')">📋 Card</button>
+    <button class="tab-btn"           data-tab="match"     onclick="UI.switchTab('match')">🏆 Match</button>
+    <button class="tab-btn"           data-tab="stats"      onclick="UI.switchTab('stats'); UI.renderStats()">📊 Stats</button>
+  </div>
+
+  <!-- ── HOLE TAB ── -->
+  <div class="tab-pane" data-tab="hole" style="display:flex;flex-direction:column;flex:1;overflow:hidden">
+
+    <!-- Hole header -->
+    <div class="hole-header">
+      <div class="hole-badge" id="hole-num">Hole 1</div>
+      <div class="hole-meta">
+        <span id="hole-par">Par 4</span>
+        <span id="hole-yards">380 yds</span>
+        <span id="hole-hdcp">Hdcp 11</span>
+      </div>
+      <div class="hole-desc" id="hole-desc"></div>
+    </div>
+
+    <!-- Pin distance -->
+    <div class="pin-section">
+      <div style="flex:1">
+        <div class="green-dists">
+          <div class="gd"><span id="dist-front">—</span><label>Front</label></div>
+          <div class="gd gd-center"><span id="dist-center">—</span><label>Center</label></div>
+          <div class="gd"><span id="dist-back">—</span><label>Back</label></div>
+        </div>
+        <div class="gps-acc" id="gps-acc">Acquiring GPS…</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
+        <button class="btn btn-primary btn-sm" onclick="UI.openRangefinder()">📷 Rangefinder</button>
+        <button class="btn btn-ghost btn-sm" onclick="App.updatePinHere()">📍 Update Pin Here</button>
+      </div>
+    </div>
+
+    <!-- Shot status -->
+    <div class="shot-status-bar" id="shot-status">Select a club to start</div>
+
+    <!-- Club suggestion -->
+    <div class="club-suggestion" id="club-suggestion"></div>
+
+    <!-- Hazards & layups -->
+    <div class="hazard-section">
+      <div class="hazard-head">⚑ Hazards &amp; Layups</div>
+      <div id="hazards-list"></div>
+    </div>
+
+    <!-- Club selector -->
+    <div class="club-section">
+      <div class="club-section-label">Select Club</div>
+      <div id="club-selector"></div>
+    </div>
+
+    <!-- Shot log -->
+    <div class="shot-log-section">
+      <div class="shot-log-label">Shots This Hole</div>
+      <div id="shot-log"></div>
+    </div>
+
+    <!-- Action buttons -->
+    <div class="action-bar">
+      <button class="btn btn-primary" id="btn-new-shot" onclick="App.newShot()">
+        🏌 New Shot
+      </button>
+      <button class="btn btn-accent" onclick="App.madeIt()">
+        🏆 Made It!
+      </button>
+      <div class="btn-voice-row">
+        <button class="btn btn-ghost" id="btn-voice" onclick="App.pushToTalk()">
+          🎤 Listen
+        </button>
+        <button class="btn btn-ghost btn-icon" onclick="App.toggleVoice()" title="Toggle always-on voice">
+          🔄
+        </button>
+        <button class="btn btn-ghost btn-icon" onclick="UI.openRangefinder()" title="Rangefinder">
+          🎯
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SCORECARD TAB ── -->
+  <div class="tab-pane" data-tab="scorecard" style="display:none;flex:1;overflow-y:auto">
+    <div style="padding:12px">
+      <div id="scorecard-table"></div>
+    </div>
+  </div>
+
+  <!-- ── MATCH TAB ── -->
+  <div class="tab-pane" data-tab="match" style="display:none;flex:1;overflow-y:auto">
+    <div class="pad">
+      <div id="match-body"></div>
+    </div>
+  </div>
+
+  <!-- ── STATS TAB (in-round) ── -->
+  <div class="tab-pane" data-tab="stats" style="display:none;flex:1;overflow-y:auto">
+    <div class="pad">
+      <div class="suggest-box">
+        <div class="card-title" style="margin-bottom:8px">Club Suggestion</div>
+        <div class="suggest-input">
+          <input id="suggest-dist-round" type="number" placeholder="Distance (yds)" min="1" max="350"
+            oninput="UI.updateStatSuggestionInline(this.value)">
+          <button class="btn btn-primary btn-sm" onclick="UI.updateStatSuggestionInline(document.getElementById('suggest-dist-round').value)">→</button>
+        </div>
+        <div id="suggest-result-round" class="sug-result"></div>
+      </div>
+      <div id="stats-clubs-round"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ STATS ═══════════════════ -->
+<div id="view-stats" class="view" style="display:none">
+  <div class="top-bar">
+    <button class="top-back" onclick="App.goHome()">←</button>
+    <h1>Club Statistics</h1>
+    <div></div>
+  </div>
+  <div class="scroll-area pad">
+    <div class="card suggest-box">
+      <div class="card-title">Club Suggestion</div>
+      <div class="suggest-input">
+        <input id="suggest-dist" type="number" placeholder="Enter distance (yds)" min="1" max="350"
+          oninput="UI.updateStatSuggestion()">
+        <button class="btn btn-primary btn-sm" onclick="UI.updateStatSuggestion()">→</button>
+      </div>
+      <div id="suggest-result" class="sug-result"></div>
+    </div>
+    <div id="stats-clubs"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════ SETTINGS ═══════════════════ -->
+<div id="view-settings" class="view" style="display:none">
+  <div class="top-bar">
+    <button class="top-back" onclick="App.goHome()">←</button>
+    <h1>Settings</h1>
+    <div></div>
+  </div>
+  <div class="scroll-area pad">
+    <div class="card">
+      <div class="form-group">
+        <label>Your Name</label>
+        <input id="setting-name" type="text" placeholder="Jason">
+      </div>
+      <div class="form-group">
+        <label>Default Tee Box</label>
+        <select id="setting-tee"></select>
+      </div>
+      <label class="toggle-row">
+        <span>Spoken confirmations</span>
+        <input id="setting-voice" type="checkbox" checked>
+      </label>
+      <label class="toggle-row">
+        <span>Auto-advance holes by GPS</span>
+        <input id="setting-autoadvance" type="checkbox" checked>
+      </label>
+    </div>
+
+    <div class="card">
+      <div class="card-title">My Bag</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:10px;line-height:1.6">
+        Set the clubs you actually carry so averages and suggestions are accurate.
+      </div>
+      <button class="btn btn-primary btn-block btn-sm" onclick="App.goBag()">🏌 Edit My Bag</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Backup &amp; Restore</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:10px;line-height:1.6">
+        Save your club averages, rounds &amp; settings off your phone so they survive a reinstall or new device.
+      </div>
+      <button class="btn btn-primary btn-block btn-sm" onclick="UI.openBackup()">💾 Backup / Restore Data</button>
+      <button class="btn btn-danger btn-sm" onclick="if(confirm('Clear all shot history? Back up first if you want to keep it.')){Store.del('clubStats');State.clubStats={};UI.toast('Cleared','success')}">
+        Clear Shot History
+      </button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">About</div>
+      <div style="font-size:13px;color:var(--muted);line-height:1.8">
+        Golf Shot Tracker · Personal edition<br>
+        Voice: say "golf [command]" or tap Listen<br>
+        GPS: best outdoors with clear sky view<br>
+        Install: tap Share → Add to Home Screen
+      </div>
+    </div>
+
+    <button class="btn btn-accent btn-block" onclick="UI.saveSettings()" style="margin-top:8px">
+      Save Settings
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════════ HISTORY ═══════════════════ -->
+<div id="view-history" class="view" style="display:none">
+  <div class="top-bar">
+    <button class="top-back" onclick="App.goHome()">←</button>
+    <h1>Round History</h1>
+    <div></div>
+  </div>
+  <div class="scroll-area pad">
+    <div id="history-body"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════ HELP / COMMANDS ═══════════════════ -->
+<div id="view-help" class="view" style="display:none">
+  <div class="top-bar">
+    <button class="top-back" onclick="App.goHome()">←</button>
+    <h1>Commands &amp; Help</h1>
+    <div></div>
+  </div>
+  <div class="scroll-area pad">
+    <div class="card">
+      <div class="card-title">🎙 Voice Commands</div>
+      <p class="help-intro">Tap <strong>🎤 Listen</strong> for one command, or <strong>🔄</strong> for always-on. In always-on mode, say <strong style="color:var(--accent)">"golf"</strong> first to wake it.</p>
+      <div class="cmd"><span class="cmd-say">"next shot"</span><span class="cmd-do">Record the shot &amp; start the next</span></div>
+      <div class="cmd"><span class="cmd-say">"made it"</span><span class="cmd-do">Hole complete — opens score entry</span></div>
+      <div class="cmd"><span class="cmd-say">"driver" · "7 iron" · "pitching wedge"</span><span class="cmd-do">Select that club</span></div>
+      <div class="cmd"><span class="cmd-say">"yardage" / "how far"</span><span class="cmd-do">Speak Front / Center / Back distances</span></div>
+      <div class="cmd"><span class="cmd-say">"score 5"</span><span class="cmd-do">Set your score for the hole</span></div>
+      <div class="cmd"><span class="cmd-say">"birdie" · "par" · "bogey"</span><span class="cmd-do">Set your score by name</span></div>
+      <div class="cmd"><span class="cmd-say">"scorecard" · "match"</span><span class="cmd-do">Jump to that tab</span></div>
+      <div class="cmd"><span class="cmd-say">"rangefinder"</span><span class="cmd-do">Open the camera rangefinder</span></div>
+      <div class="cmd"><span class="cmd-say">"commands" / "help"</span><span class="cmd-do">Show this screen</span></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">⛳ During a Hole</div>
+      <div class="cmd"><span class="cmd-say">Tap a club</span><span class="cmd-do">Starts a shot from your GPS spot</span></div>
+      <div class="cmd"><span class="cmd-say">🏌 New Shot</span><span class="cmd-do">Records distance walked, starts next</span></div>
+      <div class="cmd"><span class="cmd-say">🏆 Made It!</span><span class="cmd-do">Finish the hole &amp; enter scores</span></div>
+      <div class="cmd"><span class="cmd-say">Tap a logged shot (✎)</span><span class="cmd-do">Edit or delete it (fixes averages)</span></div>
+      <div class="cmd"><span class="cmd-say">📍 Update Pin Here</span><span class="cmd-do">Set the green center to your spot</span></div>
+      <div class="cmd"><span class="cmd-say">Auto-advance</span><span class="cmd-do">Walks you to the next hole by GPS</span></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📊 Stats &amp; Scoring</div>
+      <div class="cmd"><span class="cmd-say">My Bag</span><span class="cmd-do">Set the clubs you carry (Settings)</span></div>
+      <div class="cmd"><span class="cmd-say">Match tab</span><span class="cmd-do">Net best-ball, skins, who's winning</span></div>
+      <div class="cmd"><span class="cmd-say">Backup / Restore</span><span class="cmd-do">Save your data off-device (Settings)</span></div>
+    </div>
+
+    <div class="card course-card">
+      <div class="course-card-name">North Hampton Golf Club</div>
+      <div class="course-card-meta">Fernandina Beach, FL · Par 72</div>
+      <div class="course-card-row" style="margin-top:6px"><em>GPS pins are approximate — tap "Update Pin Here" on each green to refine.</em></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ MY BAG ═══════════════════ -->
+<div id="view-bag" class="view" style="display:none">
+  <div class="top-bar">
+    <button class="top-back" onclick="App.goSettings()">←</button>
+    <h1>My Bag</h1>
+    <div></div>
+  </div>
+  <div class="scroll-area pad">
+    <div class="card">
+      <div class="card-title">Your Clubs</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Tap a name to rename · ✕ to remove</div>
+      <div id="bag-list"></div>
+      <div class="bag-add">
+        <input id="bag-add-name" type="text" placeholder="e.g. 54° Wedge" onkeydown="if(event.key==='Enter')App.addClub()">
+        <button class="btn btn-accent btn-sm" onclick="App.addClub()">+ Add</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ SCORE MODAL ═══════════════════ -->
+<div id="score-modal" class="modal-overlay">
+  <div class="modal">
+    <h3>🏆 Hole Complete — Enter Scores</h3>
+    <div id="score-modal-body"></div>
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="btn btn-ghost" style="flex:1" onclick="document.getElementById('score-modal').style.display='none'">
+        Cancel
+      </button>
+      <button class="btn btn-accent" style="flex:1" onclick="UI.saveScoreModal()">
+        Save &amp; Next Hole →
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ SHOT EDIT MODAL ═══════════════════ -->
+<div id="shot-modal" class="modal-overlay">
+  <div class="modal">
+    <h3>✎ Edit Shot</h3>
+    <div class="form-group">
+      <label>Club</label>
+      <select id="shot-edit-club"></select>
+    </div>
+    <div class="form-group">
+      <label>Distance (yds)</label>
+      <input id="shot-edit-dist" type="number" min="0" max="400">
+    </div>
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button class="btn btn-danger" style="flex:1" onclick="UI.deleteShotEdit()">Delete</button>
+      <button class="btn btn-ghost" style="flex:1" onclick="UI.closeShotEdit()">Cancel</button>
+      <button class="btn btn-accent" style="flex:1" onclick="UI.saveShotEdit()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ BACKUP MODAL ═══════════════════ -->
+<div id="backup-modal" class="modal-overlay">
+  <div class="modal" style="max-height:88vh;overflow-y:auto">
+    <h3>💾 Backup &amp; Restore</h3>
+
+    <div class="card-title">1 · Back up (save this somewhere)</div>
+    <textarea id="backup-export" readonly
+      style="width:100%;height:110px;background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;padding:8px;font-family:monospace;outline:none"></textarea>
+    <div style="display:flex;gap:8px;margin:8px 0 16px">
+      <button class="btn btn-primary btn-sm" style="flex:1" onclick="UI.copyBackup()">📋 Copy</button>
+      <button class="btn btn-accent btn-sm" style="flex:1" onclick="UI.shareBackup()">📤 Share / Save File</button>
+    </div>
+
+    <div class="card-title">2 · Restore (paste a backup here)</div>
+    <textarea id="backup-import" placeholder="Paste your backup text, then tap Restore…"
+      style="width:100%;height:90px;background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;padding:8px;font-family:monospace;outline:none"></textarea>
+
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="btn btn-ghost" style="flex:1" onclick="UI.closeBackup()">Close</button>
+      <button class="btn btn-accent" style="flex:1" onclick="UI.doRestore()">♻ Restore</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ RANGEFINDER ═══════════════════ -->
+<div id="rangefinder-overlay">
+  <video id="rf-video" autoplay playsinline muted></video>
+  <button class="btn btn-danger rf-close" onclick="UI.closeRangefinder()">✕ Close</button>
+  <div class="rf-ui">
+    <div id="rf-no-cam">📷 Camera unavailable — GPS only</div>
+    <div class="rf-dist-box">
+      <div id="rf-distance">— yds</div>
+      <div class="rf-label">TO PIN</div>
+    </div>
+    <div id="rf-bearing">Acquiring GPS…</div>
+  </div>
+</div>
+
+<!-- ═══════════════════ TOAST ═══════════════════ -->
+<div id="toast"></div>
+
+<!-- Scripts -->
+<script src="./course-data.js"></script>
+<script src="./app.js"></script>
+<script>
+// Extra inline helpers that bridge HTML and app.js
+UI.updateStatSuggestionInline = function(yards) {
+  yards = parseInt(yards);
+  const el = document.getElementById('suggest-result-round');
+  const el2 = document.getElementById('stats-clubs-round');
+  if (!el) return;
+  if (!yards || isNaN(yards)) { el.innerHTML = ''; return; }
+  const suggestions = State.topSuggestions(yards);
+  if (!suggestions.length) { el.innerHTML = '<div style="color:var(--muted);font-size:13px">Hit more shots to get suggestions</div>'; return; }
+  el.innerHTML = suggestions.map((s, i) =>
+    `<div class="sug-row ${i === 0 ? 'sug-top' : ''}">
+      ${i === 0 ? '✓ ' : ''}<strong>${s.club.name}</strong> — ${s.avg}y avg (off by ${s.diff}y)
+    </div>`
+  ).join('');
+
+  // Also re-render stats
+  if (el2) {
+    const clubs = State.clubs.map(c => {
+      const shots = State.clubStats[c.id] || [];
+      if (!shots.length) return null;
+      const avg = Math.round(shots.reduce((a, b) => a + b) / shots.length);
+      const max = Math.max(...shots), min = Math.min(...shots);
+      return { club: c, avg, max, min, count: shots.length };
+    }).filter(Boolean).sort((a, b) => b.avg - a.avg);
+    if (!clubs.length) { el2.innerHTML = '<p class="empty-state">No data yet</p>'; return; }
+    el2.innerHTML = clubs.map(d => `
+      <div class="stat-row">
+        <div class="stat-club">${d.club.name}</div>
+        <div class="stat-avg">${d.avg}<small>y avg</small></div>
+        <div class="stat-range">${d.min}–${d.max}y · ${d.count} shots</div>
+        <div class="stat-bar"><div class="stat-fill" style="width:${(d.avg/clubs[0].avg*100).toFixed(0)}%"></div></div>
+      </div>`).join('');
+  }
+};
+</script>
+</body>
+</html>
