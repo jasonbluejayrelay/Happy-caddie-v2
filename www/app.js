@@ -356,15 +356,16 @@ const State = {
     return dist;
   },
 
-  setScore(playerIdx, score) {
-    if (!this.hole) return;
+  setScore(playerIdx, score, holeIdx = this.holeIdx) {
+    const hole = this.round?.holes[holeIdx];
+    if (!hole) return;
     const player = this.round.players[playerIdx];
     if (!player) return;
-    this.hole.scores[player.id] = score;
+    hole.scores[player.id] = score;
     // Compute best ball per team
     for (const team of this.round.teams) {
-      const scores = team.playerIds.map(pid => this.hole.scores[pid]).filter(s => s != null);
-      if (scores.length) this.hole.teamScores[team.id] = Math.min(...scores);
+      const scores = team.playerIds.map(pid => hole.scores[pid]).filter(s => s != null);
+      if (scores.length) hole.teamScores[team.id] = Math.min(...scores);
     }
     this.saveActive();
   },
@@ -796,7 +797,7 @@ const UI = {
     const score = prompt(`${State.round.players[playerIdx]?.name} — Hole ${holeIdx + 1} score:`, current);
     const n = parseInt(score);
     if (!isNaN(n) && n > 0) {
-      State.setScore(playerIdx, n);
+      State.setScore(playerIdx, n, holeIdx);
       UI.renderScorecard();
     }
   },
@@ -1393,7 +1394,9 @@ const App = {
       UI.toast(`Score set: ${score}`, 'success');
       return;
     }
-    const parWords = { eagle: -2, birdie: -1, par: 0, bogey: 1, 'double bogey': 2, 'double': 2, 'triple': 3 };
+    // Ordered most-specific first: "bogey" is a substring of "double bogey",
+    // and "par" is a substring of many words, so they must be matched last.
+    const parWords = { eagle: -2, birdie: -1, 'double bogey': 2, 'triple': 3, 'double': 2, bogey: 1, par: 0 };
     for (const [word, diff] of Object.entries(parWords)) {
       if (t.includes(word) && State.holeData) {
         const score = State.holeData.par + diff;
