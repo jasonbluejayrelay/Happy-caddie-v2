@@ -42,14 +42,23 @@ jobs:
         run: npx cap sync android
 
       - name: Use a stable debug signing key
-        # Gradle's debug signingConfig signs with ~/.android/debug.keystore, which
-        # is normally auto-generated per machine — so every CI build would sign the
-        # APK with a different key and Android refuses to update an installed app
-        # ("App not installed"). Ship a fixed debug keystore so every build signs
-        # identically and updates install over each other.
+        # Without this, the debug keystore is auto-generated per machine, so every
+        # CI build signs the APK with a different key and Android refuses to update
+        # an installed app ("App not installed"). The default keystore location
+        # ($HOME/.android) isn't reliable on hosted runners, so wire our committed
+        # keystore into the module's debug signingConfig explicitly (AGP applies a
+        # signingConfigs.debug to the debug build type automatically).
         run: |
-          mkdir -p ~/.android
-          cp keystore/debug.keystore ~/.android/debug.keystore
+          cp keystore/debug.keystore android/app/debug.keystore
+          node -e '
+            const fs = require("fs");
+            const f = "android/app/build.gradle";
+            let s = fs.readFileSync(f, "utf8");
+            const block = `\n    signingConfigs {\n        debug {\n            storeFile file("debug.keystore")\n            storePassword "android"\n            keyAlias "androiddebugkey"\n            keyPassword "android"\n        }\n    }\n`;
+            s = s.replace(/android\s*\{/, m => m + block);
+            fs.writeFileSync(f, s);
+            console.log("Injected fixed debug signingConfig");
+          '
 
       - name: Build debug APK
         run: |
