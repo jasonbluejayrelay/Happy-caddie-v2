@@ -125,9 +125,21 @@ const Voice = {
     return true;
   },
 
+  // Speech engines routinely mishear "golf" as "gulf"/"gold", so accept close
+  // homophones and a couple of natural prefixes as the wake word.
+  WAKE: /\b(?:golf|gulf|gold|caddie|caddy)\b/i,
+  WAKE_G: /\b(?:golf|gulf|gold|caddie|caddy)\b/gi,
+
   listen() {
     if (!this.recog || this.active) return;
-    try { this.recog.start(); this.active = true; UI.setVoiceStatus(true); } catch {}
+    try {
+      // In always-on mode keep the mic open so the wake word isn't lost during
+      // the stop/restart gap; push-to-talk grabs a single phrase.
+      this.recog.continuous = this.continuous;
+      this.recog.start();
+      this.active = true;
+      UI.setVoiceStatus(true);
+    } catch {}
   },
 
   stop() { this.continuous = false; if (this.recog && this.active) { try { this.recog.stop(); } catch {} } },
@@ -139,19 +151,32 @@ const Voice = {
   },
 
   _handle(alts) {
-    const text = alts[0];
-    // Wake word check in continuous mode
-    if (this.continuous) {
-      const hasWake = alts.some(a => /\bgolf\b/.test(a));
-      if (!hasWake && !alts.some(a => this._isCommand(a))) return;
+    const hasWake = alts.some(a => this.WAKE.test(a));
+    const looksLikeCmd = alts.some(a => this._isCommand(a));
+
+    // In always-on mode, ignore background speech that is neither the wake word
+    // nor a recognizable command.
+    if (this.continuous && !hasWake && !looksLikeCmd) return;
+
+    // Prefer the alternative that actually carries the wake word or a command.
+    const text = alts.find(a => this.WAKE.test(a) || this._isCommand(a)) || alts[0];
+    const cmd = text.replace(this.WAKE_G, ' ').replace(/\s+/g, ' ').trim();
+
+    // Wake word heard with nothing after it — acknowledge so the user knows it
+    // registered (the only signal you get when not looking at the phone).
+    if (hasWake && !cmd) {
+      UI.toast('Listening… say a command', 'info', 1500);
+      Speak.say('Go ahead');
+      return;
     }
-    // Strip wake word and parse command
-    const cmd = text.replace(/\bgolf\b/gi, '').trim() || text;
-    if (this.onCommand) this.onCommand(cmd, alts);
+
+    // Otherwise hand the full phrase to the command parser, which knows the
+    // complete vocabulary.
+    if (this.onCommand) this.onCommand(cmd || text, alts);
   },
 
   _isCommand(t) {
-    return /next shot|new shot|made it|in the hole|holed out|score \d|par|bogey|birdie|eagle|club |driver|iron|wood|hybrid|wedge|putter/.test(t);
+    return /next shot|new shot|made it|in the hole|holed out|score \d|par|bogey|birdie|eagle|double|triple|club |driver|iron|wood|hybrid|wedge|putter|yardage|how far|distance|rangefinder|camera|scorecard|the card|match|standings|winning|commands|what can i say|help/.test(t);
   }
 };
 
