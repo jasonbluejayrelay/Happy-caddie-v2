@@ -316,12 +316,16 @@ const State = {
       this.shotStart.lat, this.shotStart.lon, GPS.pos.lat, GPS.pos.lon
     ));
     if (dist < 5) return 0; // ignore accidental taps
-    const shot = { club: this.currentClub, dist, lat: GPS.pos.lat, lon: GPS.pos.lon, ts: Date.now() };
+    // The club belongs to the shot that was *started* here — not whatever club
+    // is now selected for the next shot. (Selecting the next club before tapping
+    // the button must not re-attribute the completed shot.)
+    const club = this.shotStart.club ?? this.currentClub;
+    const shot = { club, dist, lat: GPS.pos.lat, lon: GPS.pos.lon, ts: Date.now() };
     this.hole.shots.push(shot);
     // Update club stats
-    if (this.currentClub && dist > 10) {
-      if (!this.clubStats[this.currentClub]) this.clubStats[this.currentClub] = [];
-      this.clubStats[this.currentClub].push(dist);
+    if (club && dist > 10) {
+      if (!this.clubStats[club]) this.clubStats[club] = [];
+      this.clubStats[club].push(dist);
       Store.set('clubStats', this.clubStats);
     }
     this.saveActive();
@@ -330,7 +334,7 @@ const State = {
 
   startShot() {
     if (!GPS.pos) return false;
-    this.shotStart = { lat: GPS.pos.lat, lon: GPS.pos.lon };
+    this.shotStart = { lat: GPS.pos.lat, lon: GPS.pos.lon, club: this.currentClub };
     this.pendingShot = true;
     return true;
   },
@@ -338,7 +342,7 @@ const State = {
   nextShot(club) {
     const dist = this.recordShotEnd();
     this.currentClub = club || this.currentClub;
-    this.shotStart = GPS.pos ? { lat: GPS.pos.lat, lon: GPS.pos.lon } : null;
+    this.shotStart = GPS.pos ? { lat: GPS.pos.lat, lon: GPS.pos.lon, club: this.currentClub } : null;
     this.pendingShot = !!GPS.pos;
     this.saveActive();
     return dist;
@@ -568,7 +572,7 @@ const UI = {
     // Shot status
     const shotEl = this.$('shot-status');
     shotEl.textContent = State.pendingShot
-      ? `Shot ${hole.shots.length + 1} in progress — ${State.clubs.find(c => c.id === State.currentClub)?.name || 'No club'}`
+      ? `Shot ${hole.shots.length + 1} in progress — ${State.clubs.find(c => c.id === (State.shotStart?.club ?? State.currentClub))?.name || 'No club'}`
       : `${hole.shots.length} shot${hole.shots.length !== 1 ? 's' : ''} this hole`;
 
     // Shot log
@@ -888,47 +892,63 @@ const UI = {
   },
 
   // ── Stats View ─────────────────────────────────────────────────────────
-  renderStats() {
-    const el = this.$('stats-clubs');
+  // Build the club-averages markup shared by the standalone Stats view and the
+  // in-round Stats tab.
+  _clubStatsHtml() {
     const clubs = State.clubs.map(c => {
       const shots = State.clubStats[c.id] || [];
       if (!shots.length) return null;
       const avg = Math.round(shots.reduce((a, b) => a + b) / shots.length);
-      const max = Math.max(...shots);
-      const min = Math.min(...shots);
-      return { club: c, avg, max, min, count: shots.length };
+      return { club: c, avg, max: Math.max(...shots), min: Math.min(...shots), count: shots.length };
     }).filter(Boolean).sort((a, b) => b.avg - a.avg);
 
     if (!clubs.length) {
-      el.innerHTML = '<p class="empty-state">No shot data yet.<br>Track shots during a round to see averages here.</p>';
-      return;
+      return '<p class="empty-state">No shot data yet.<br>Track shots during a round to see averages here.</p>';
     }
-
-    el.innerHTML = clubs.map(d => `
+    return clubs.map(d => `
       <div class="stat-row">
         <div class="stat-club">${d.club.name}</div>
         <div class="stat-avg">${d.avg}<small>y avg</small></div>
         <div class="stat-range">${d.min}–${d.max}y · ${d.count} shots</div>
         <div class="stat-bar"><div class="stat-fill" style="width:${(d.avg / clubs[0].avg * 100).toFixed(0)}%"></div></div>
       </div>`).join('');
-
-    // Suggestion tool
-    const distEl = this.$('suggest-dist');
-    if (distEl) this.updateStatSuggestion();
   },
 
-  updateStatSuggestion() {
-    const yards = parseInt(this.$('suggest-dist')?.value);
-    const el = this.$('suggest-result');
-    if (!el) return;
-    if (!yards || isNaN(yards)) { el.innerHTML = ''; return; }
+  _suggestionHtml(yards) {
+    if (!yards || isNaN(yards)) return '';
     const suggestions = State.topSuggestions(yards);
-    if (!suggestions.length) { el.innerHTML = 'Need more shot data'; return; }
-    el.innerHTML = suggestions.map((s, i) =>
+    if (!suggestions.length) return 'Need more shot data';
+    return suggestions.map((s, i) =>
       `<div class="sug-row ${i === 0 ? 'sug-top' : ''}">
         ${i === 0 ? '✓ ' : ''}<strong>${s.club.name}</strong> — ${s.avg}y avg (off by ${s.diff}y)
       </div>`
     ).join('');
+  },
+
+  // Standalone Stats view (view-stats).
+  renderStats() {
+    const el = this.$('stats-clubs');
+    if (el) el.innerHTML = this._clubStatsHtml();
+    if (this.$('suggest-dist')) this.updateStatSuggestion();
+  },
+
+  // In-round Stats tab (separate element ids so both can coexist).
+  renderStatsRound() {
+    const el = this.$('stats-clubs-round');
+    if (el) el.innerHTML = this._clubStatsHtml();
+    this.updateStatSuggestionInline(this.$('suggest-dist-round')?.value);
+  },
+
+  updateStatSuggestion() {
+    const el = this.$('suggest-result');
+    if (!el) return;
+    el.innerHTML = this._suggestionHtml(parseInt(this.$('suggest-dist')?.value));
+  },
+
+  updateStatSuggestionInline(val) {
+    const el = this.$('suggest-result-round');
+    if (!el) return;
+    el.innerHTML = this._suggestionHtml(parseInt(val));
   },
 
   // ── Tab switching ──────────────────────────────────────────────────────
@@ -938,6 +958,7 @@ const UI = {
     document.querySelectorAll('.tab-pane').forEach(p => p.style.display = p.dataset.tab === tab ? 'block' : 'none');
     if (tab === 'scorecard') this.renderScorecard();
     if (tab === 'match') this.renderMatch();
+    if (tab === 'stats') this.renderStatsRound();
     if (tab === 'hole') { this.renderHole(); }
   },
 
