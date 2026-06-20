@@ -56,21 +56,20 @@ async function findCourse(query) {
     return { name: query, bbox: [s, w, n, e] };
   }
   const kw = (query.split(',')[0] || query).replace(/\b(golf|club|course|cc|g\.?c\.?)\b/ig, '').trim() || query;
-  const region = '24.40,-87.70,31.10,-79.90'; // all of Florida
-  console.log(`Searching OSM for a golf course matching "${kw}" across Florida…`);
-  const q = `[out:json][timeout:120];
+  const region = '30.20,-82.30,30.95,-81.25'; // NE Florida (Nassau/Amelia/Jacksonville)
+  console.log(`Searching OSM for a golf course matching "${kw}" in NE Florida…`);
+  const q = `[out:json][timeout:90];
     (
       way[leisure=golf_course][name~"${kw}",i](${region});
       relation[leisure=golf_course][name~"${kw}",i](${region});
     );
-    out tags geom;`;
+    out tags bb;`;
   const els = await overpassRaw(q);
-  const withGeom = els.filter(e => (e.geometry && e.geometry.length) || (e.members && e.members.length));
-  if (withGeom.length) {
-    const el = withGeom[0];
-    const geom = el.geometry || el.members.flatMap(m => m.geometry || []);
-    console.log(`  Found: "${el.tags?.name}" (osm ${el.type}/${el.id})`);
-    return { name: el.tags?.name, bbox: bboxOf(geom) };
+  const m = els.find(e => e.bounds);
+  if (m) {
+    const b = m.bounds;
+    console.log(`  Found: "${m.tags?.name}" (osm ${m.type}/${m.id})`);
+    return { name: m.tags?.name, bbox: [b.minlat, b.minlon, b.maxlat, b.maxlon] };
   }
   // Diagnostic: list golf courses mapped near Fernandina Beach so we know what's there.
   console.log('  No name match. Listing golf courses mapped in NE Florida for reference:');
