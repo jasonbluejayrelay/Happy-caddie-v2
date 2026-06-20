@@ -521,6 +521,65 @@ const State = {
 };
 
 // Summarize a finished round for the history view.
+// ─── Strokes Gained (estimated, vs a scratch baseline) ─────────────────────
+// Baselines are approximate PGA "expected strokes to hole out" by lie/distance.
+// Accuracy depends on correct pin positions (use "Update Pin Here").
+const SG = {
+  _interp(t, x) {
+    if (x <= t[0][0]) return t[0][1];
+    if (x >= t[t.length - 1][0]) return t[t.length - 1][1];
+    for (let i = 1; i < t.length; i++) if (x <= t[i][0]) {
+      const [x0, y0] = t[i - 1], [x1, y1] = t[i];
+      return y0 + (y1 - y0) * (x - x0) / (x1 - x0);
+    }
+    return t[t.length - 1][1];
+  },
+  TEE: [[100, 2.85], [150, 2.96], [200, 3.12], [250, 3.45], [300, 3.79], [350, 3.91], [400, 4.0], [450, 4.12], [500, 4.28], [550, 4.46], [600, 4.6]],
+  FW: [[10, 2.18], [20, 2.40], [40, 2.60], [60, 2.66], [80, 2.72], [100, 2.80], [120, 2.85], [140, 2.91], [160, 2.99], [180, 3.08], [200, 3.19], [220, 3.28], [240, 3.36], [260, 3.44], [280, 3.53], [300, 3.62]],
+  PUTT: [[1, 1.001], [2, 1.009], [3, 1.053], [4, 1.147], [5, 1.234], [6, 1.33], [7, 1.41], [8, 1.48], [9, 1.53], [10, 1.58], [15, 1.78], [20, 1.87], [25, 1.94], [30, 2.0], [40, 2.10], [50, 2.18], [60, 2.25], [90, 2.4]],
+  eTee(yds) { return this._interp(this.TEE, yds); },
+  eApproach(yds) { return this._interp(this.FW, yds); },
+  ePutt(feet) { return this._interp(this.PUTT, feet); }
+};
+
+// Per-round strokes gained vs baseline, split into off-the-tee / approach / putting.
+function strokesGainedForRound(r) {
+  const course = COURSES.find(c => c.id === r.courseId);
+  if (!course) return null;
+  const ON_GREEN = 18; // yds from pin counted as "on the green"
+  const cat = { ott: 0, app: 0, putt: 0 };
+  let holesCounted = 0;
+  r.holes.forEach((hole, i) => {
+    const hd = course.holes[i];
+    const shots = hole?.shots || [];
+    if (!hd || !shots.length) return;
+    const pin = hd.pin;
+    let start = hd.tee, counted = false;
+    shots.forEach((s, k) => {
+      const startDist = haversineYards(start.lat, start.lon, pin.lat, pin.lon);
+      const endDist = haversineYards(s.lat, s.lon, pin.lat, pin.lon);
+      const onGreen = endDist <= ON_GREEN;
+      const isTee = k === 0 && hd.par > 3;
+      const eBefore = isTee ? SG.eTee(startDist) : SG.eApproach(startDist);
+      const eAfter = onGreen ? SG.ePutt(endDist * 3) : SG.eApproach(endDist);
+      const sg = eBefore - eAfter - 1;
+      cat[isTee ? 'ott' : 'app'] += sg;
+      counted = true;
+      start = { lat: s.lat, lon: s.lon };
+    });
+    // Putting: from where the ball reached the green vs. the putts taken.
+    const lastDist = haversineYards(start.lat, start.lon, pin.lat, pin.lon);
+    const putts = hole.stats?.putts;
+    if (putts != null && lastDist <= ON_GREEN) {
+      cat.putt += SG.ePutt(Math.max(2, lastDist * 3)) - putts;
+      counted = true;
+    }
+    if (counted) holesCounted++;
+  });
+  if (!holesCounted) return null;
+  return { ...cat, total: cat.ott + cat.app + cat.putt, holesCounted };
+}
+
 function summarizeRound(r) {
   const course = COURSES.find(c => c.id === r.courseId);
   const coursePar = course?.par ?? 72;
@@ -1152,6 +1211,39 @@ const UI = {
     const el = this.$('stats-clubs');
     if (el) el.innerHTML = this._clubStatsHtml();
     if (this.$('suggest-dist')) this.updateStatSuggestion();
+    this.renderStrokesGained();
+  },
+
+  // Estimated strokes gained vs a scratch baseline, averaged over tracked rounds.
+  renderStrokesGained() {
+    const el = this.$('sg-summary');
+    if (!el) return;
+    const sgs = Store.get('rounds', []).map(strokesGainedForRound).filter(Boolean);
+    if (!sgs.length) {
+      el.innerHTML = '<div class="card"><div class="card-title">Strokes Gained</div>' +
+        '<p class="empty-state" style="padding:8px 0">Track your shots over a round to see strokes gained by part of the game.</p></div>';
+      return;
+    }
+    const n = sgs.length;
+    const avg = k => sgs.reduce((a, b) => a + b[k], 0) / n;
+    const rows = [['Off the tee', 'ott'], ['Approach', 'app'], ['Putting', 'putt'], ['Total', 'total']];
+    const maxAbs = Math.max(0.5, ...rows.map(([, k]) => Math.abs(avg(k))));
+    const fmt = v => (v >= 0 ? '+' : '') + v.toFixed(1);
+    el.innerHTML = `<div class="card">
+      <div class="card-title">Strokes Gained · est. · ${n} round${n !== 1 ? 's' : ''}</div>
+      ${rows.map(([label, k]) => {
+        const v = avg(k), pct = Math.min(100, Math.abs(v) / maxAbs * 100), pos = v >= 0;
+        return `<div class="sg-row ${k === 'total' ? 'sg-total' : ''}">
+          <div class="sg-label">${label}</div>
+          <div class="sg-track">
+            <div class="sg-bar ${pos ? 'sg-pos' : 'sg-neg'}" style="width:${pct / 2}%; ${pos ? 'left:50%' : 'right:50%'}"></div>
+            <div class="sg-mid"></div>
+          </div>
+          <div class="sg-val ${pos ? 'sg-pos-t' : 'sg-neg-t'}">${fmt(v)}</div>
+        </div>`;
+      }).join('')}
+      <div style="font-size:11px;color:var(--muted);margin-top:8px">Per round vs. a scratch baseline. Positive = better than scratch. Estimated from GPS shots + putts; improves with accurate pin positions.</div>
+    </div>`;
   },
 
   // In-round Stats tab (separate element ids so both can coexist).
