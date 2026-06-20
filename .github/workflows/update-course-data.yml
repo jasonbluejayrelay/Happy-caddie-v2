@@ -1,0 +1,45 @@
+name: Update course data (OpenStreetMap)
+
+# Manually run from the Actions tab. Pulls tee/green/hazard coordinates for the
+# course from OpenStreetMap and opens a PR updating www/course-data.js.
+on:
+  workflow_dispatch:
+    inputs:
+      query:
+        description: Course search (name + town)
+        default: North Hampton Golf Club, Fernandina Beach, FL
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build course data from OpenStreetMap
+        run: node tools/build-course-data.mjs "${{ inputs.query }}"
+
+      - name: Open a pull request with the new coordinates
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if git diff --quiet -- www/course-data.js; then
+            echo "No coordinate changes produced."; exit 0
+          fi
+          branch="auto/course-data-$(date +%s)"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add www/course-data.js
+          git commit -m "Update course coordinates from OpenStreetMap"
+          git push -u origin "$branch"
+          gh pr create --base main --head "$branch" \
+            --title "Course coordinates from OpenStreetMap" \
+            --body "Auto-generated tee / green (front-center-back) / hazard coordinates for **${{ inputs.query }}** from OpenStreetMap (© OpenStreetMap contributors, ODbL). Review the diff and the in-app map before merging."
