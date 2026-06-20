@@ -681,6 +681,10 @@ const UI = {
     // Shot log
     this.renderShotLog();
 
+    // Putts counter
+    const pc = this.$('putt-count');
+    if (pc) pc.textContent = hole.stats?.putts ?? 2;
+
     // Club selector
     this.renderClubSelector();
 
@@ -905,11 +909,27 @@ const UI = {
   },
 
   // ── Score Modal ────────────────────────────────────────────────────────
+  // On-hole putts counter (GPS can't see putts, so count them by tap). Feeds the
+  // score pre-fill and the per-hole putts stat.
+  changePutts(d) {
+    const hole = State.hole;
+    if (!hole) return;
+    hole.stats = hole.stats || { fir: null, gir: null, putts: null };
+    const v = Math.max(0, Math.min(10, (hole.stats.putts ?? 2) + d));
+    hole.stats.putts = v;
+    State.saveActive();
+    const el = this.$('putt-count');
+    if (el) el.textContent = v;
+  },
+
   showScoreModal() {
     const hd = State.holeData;
     const hole = State.hole;
     const el = this.$('score-modal-body');
-    const myShots = hole.shots.length + (State.pendingShot ? 1 : 0);
+    // Your score = GPS-tracked full shots (+ any in-progress) + putts. Putts and
+    // short strokes can't be GPS-tracked, so they come from the on-hole counter.
+    const putts = hole.stats?.putts ?? 2;
+    const myShots = hole.shots.length + (State.pendingShot ? 1 : 0) + putts;
     this._statPick = { fir: hole.stats?.fir ?? null, gir: hole.stats?.gir ?? null };
 
     const scoreRows = State.round.players.map((p, i) => {

@@ -193,6 +193,15 @@ html, body {
   background: var(--bg); border-bottom: 1px solid var(--border);
   min-height: 34px;
 }
+
+.putt-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 16px; border-top: 1px solid var(--border);
+}
+.putt-label { font-size: 14px; font-weight: 600; }
+.putt-stepper { display: flex; align-items: center; gap: 14px; }
+.putt-stepper #putt-count { font-size: 20px; font-weight: 800; min-width: 22px; text-align: center; }
+.putt-stepper .btn { min-width: 40px; font-size: 20px; line-height: 1; }
 .sug { cursor: pointer; padding: 2px 6px; border-radius: 4px; }
 .sug-best { color: var(--accent); font-weight: 700; background: rgba(76,175,120,0.12); }
 
@@ -591,6 +600,16 @@ select option { background: var(--card); }
     <div class="shot-log-section">
       <div class="shot-log-label">Shots This Hole</div>
       <div id="shot-log"></div>
+    </div>
+
+    <!-- Putts counter (GPS can't track putts — tap to count them) -->
+    <div class="putt-row">
+      <span class="putt-label">⛳ Putts this hole</span>
+      <div class="putt-stepper">
+        <button class="btn btn-ghost btn-sm" onclick="UI.changePutts(-1)">−</button>
+        <span id="putt-count">2</span>
+        <button class="btn btn-ghost btn-sm" onclick="UI.changePutts(1)">+</button>
+      </div>
     </div>
 
     <!-- Action buttons -->
