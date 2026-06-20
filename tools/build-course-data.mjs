@@ -147,16 +147,14 @@ async function main() {
   const bunkers = ways.filter(w => w.tags?.golf === 'bunker' || w.tags?.natural === 'sand');
   const water = ways.filter(w => w.tags?.golf === 'water_hazard' || w.tags?.golf === 'lateral_water_hazard' || w.tags?.natural === 'water');
   console.log(`Found: holes=${holes.length} greens=${greens.length} tees=${tees.length} bunkers=${bunkers.length} water=${water.length}`);
-  if (holes.length < 9 || greens.length < 9) {
-    console.error('Not enough hole/green data in OSM for a confident rebuild. Aborting (no file written).');
-    process.exit(1);
-  }
 
   // Load existing course-data to preserve par/handicap/yardages/description.
   const srcPath = 'www/course-data.js';
   const src = fs.readFileSync(srcPath, 'utf8');
   const COURSES = (new Function(src + '; return COURSES;'))();
   const course = COURSES[0];
+  // Record the real course center (best-effort relocate anchor / Satellite fallback).
+  course.center = { lat: round6((s + n) / 2), lon: round6((w + e) / 2) };
 
   const byNum = {};
   for (const h of holes) {
@@ -167,34 +165,32 @@ async function main() {
   let matched = 0;
   for (const hd of course.holes) {
     const hw = byNum[hd.number];
-    if (!hw) { console.warn(`  hole ${hd.number}: no OSM hole way (ref)`); continue; }
+    if (!hw) { console.warn(`  hole ${hd.number}: no OSM hole way (ref) — left as-is`); continue; }
     const a = hw.geometry[0], z = hw.geometry[hw.geometry.length - 1];
-    // green nearer the hole's last node, tee nearer the first node
     const gN = nearestFeature(greens, z.lat, z.lon);
     const tN = nearestFeature(tees, a.lat, a.lon);
-    if (!gN.feat || gN.dist > 60) { console.warn(`  hole ${hd.number}: no green within 60m`); continue; }
+    if (!gN.feat || gN.dist > 60) { console.warn(`  hole ${hd.number}: no green within 60m — left as-is`); continue; }
     const tee = tN.feat && tN.dist < 60 ? tN.feat._c : { lat: round6(a.lat), lon: round6(a.lon) };
     hd.tee = tee;
     hd.green = greenFCB(gN.feat.geometry, tee);
     hd.pin = hd.green.center;
-    // hazards within ~45m of the hole line centroid->green span
     const hz = [];
     const near = (f) => {
-      // distance from feature centroid to the straight tee->green segment (approx via endpoints)
       const dTee = meters(f._c.lat, f._c.lon, tee.lat, tee.lon);
       const dGreen = meters(f._c.lat, f._c.lon, hd.green.center.lat, hd.green.center.lon);
       const span = meters(tee.lat, tee.lon, hd.green.center.lat, hd.green.center.lon) + 40;
-      return (dTee + dGreen) < span + 60; // rough "near the corridor"
+      return (dTee + dGreen) < span + 60;
     };
     for (const b of bunkers) if (near(b)) hz.push({ type: 'bunker', label: 'Bunker', lat: round6(b._c.lat), lon: round6(b._c.lon) });
     for (const w of water) if (near(w)) hz.push({ type: 'water', label: 'Water', lat: round6(w._c.lat), lon: round6(w._c.lon) });
-    if (hz.length) hd.hazards = hz.slice(0, 6);
-    delete hd.carries; // superseded by real hazards
+    if (hz.length) hd.hazards = hz.slice(0, 8);
+    delete hd.carries;
     matched++;
     console.log(`  hole ${hd.number}: tee+green set, hazards=${hz.length}`);
   }
-  console.log(`Matched ${matched}/${course.holes.length} holes`);
-  if (matched < 12) { console.error('Too few holes matched; aborting.'); process.exit(1); }
+  console.log(`Matched ${matched}/${course.holes.length} holes; course.center set to`, course.center);
+  // Best-effort: always write (course relocated + whatever OSM had). The PR shows
+  // exactly what changed; remaining greens get fine-tuned on the Satellite editor.
 
   const header = `// ${course.name} — coordinates from OpenStreetMap (© OpenStreetMap contributors, ODbL)\n// Generated ${new Date().toISOString().slice(0, 10)} by tools/build-course-data.mjs\n\n`;
   const out = header + 'const COURSES = ' + JSON.stringify(COURSES, null, 2) + ';\n\n'

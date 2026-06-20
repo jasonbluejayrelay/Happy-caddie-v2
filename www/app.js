@@ -1456,8 +1456,24 @@ const UI = {
     if (!ok || !window.L) { show('Could not load the map library.'); return; }
     if (!navigator.onLine) show('🛰 Satellite imagery needs an internet connection.\nMarkers still show; reconnect to load imagery.');
     this._initSatMap();
+    // If this hole isn't mapped yet but we know the real course center, open there
+    // in edit mode so you can drag the tee/green onto the actual hole.
+    const placed = this._holePlaced();
+    if (!placed && State.course?.center) this._satEdit = true;
+    this.$('sat-edit-btn').textContent = this._satEdit ? '✓ Done' : '✎ Edit';
     this._renderSatMarkers(true);
     this.$('sat-hint').style.display = this._satEdit ? 'block' : 'none';
+    this.$('sat-hint').textContent = placed
+      ? 'Edit on — drag the T and 🚩 to fine-tune; saves automatically.'
+      : 'Drag the T (tee) and 🚩 (green) onto this hole, then tap Done.';
+  },
+
+  _holePlaced() {
+    const hd = State.holeData;
+    if (!hd) return false;
+    if (hd.green) return true;
+    const cid = State.round?.courseId || (typeof COURSES !== 'undefined' && COURSES[0] && COURSES[0].id);
+    return !!(State.courseOverrides?.[cid]?.[State.holeIdx]);
   },
 
   closeSatellite() {
@@ -1488,10 +1504,16 @@ const UI = {
       if (drag && onEnd) m.on('dragend', e => onEnd(e.target.getLatLng()));
       pts.push([lat, lon]); return m;
     };
+    // For holes not yet mapped, start the tee/green markers at the real course
+    // center so they're visible and you can drag them onto the hole.
+    const center = State.course?.center;
+    const useCenter = !this._holePlaced() && !!center;
+    const teeLL = useCenter ? center : hd.tee;
+    const pinLL = useCenter ? center : hd.pin;
     // tee + pin (draggable in edit mode)
-    add(hd.tee.lat, hd.tee.lon, this._satIcon('<div style="background:#dcdcdc;color:#143020;border-radius:4px;padding:0 3px">T</div>'), this._satEdit,
+    add(teeLL.lat, teeLL.lon, this._satIcon('<div style="background:#dcdcdc;color:#143020;border-radius:4px;padding:0 3px">T</div>'), this._satEdit,
       ll => this._saveSatPoint('tee', ll));
-    add(hd.pin.lat, hd.pin.lon, this._satIcon('<div style="font-size:18px">🚩</div>'), this._satEdit,
+    add(pinLL.lat, pinLL.lon, this._satIcon('<div style="font-size:18px">🚩</div>'), this._satEdit,
       ll => this._saveSatPoint('pin', ll));
     // mapped hazards
     State.hazardTargets(hd).forEach(h => add(h.point.lat, h.point.lon,
@@ -1503,7 +1525,8 @@ const UI = {
       L.circleMarker([GPS.pos.lat, GPS.pos.lon], { radius: 6, color: '#fff', weight: 2, fillColor: '#3da5ff', fillOpacity: 1 }).addTo(this._satLayer);
       pts.push([GPS.pos.lat, GPS.pos.lon]);
     }
-    if (fit && pts.length) map.fitBounds(L.latLngBounds(pts).pad(0.35), { animate: false });
+    if (useCenter) map.setView([center.lat, center.lon], 16);
+    else if (fit && pts.length) map.fitBounds(L.latLngBounds(pts).pad(0.35), { animate: false });
   },
 
   toggleSatEdit() {
@@ -1518,6 +1541,7 @@ const UI = {
     State.setHolePoint(State.holeIdx, key, latlng.lat, latlng.lng);
     UI.toast(`${key === 'tee' ? 'Tee' : 'Green'} position saved`, 'success', 1500);
     if (UI.activeTab === 'hole') UI.updatePinDistance();
+    this._renderSatMarkers(false); // markers now anchored to the saved spot
   },
 
   // ── Settings ───────────────────────────────────────────────────────────
