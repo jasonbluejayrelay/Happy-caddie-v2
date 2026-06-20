@@ -95,9 +95,9 @@ jobs:
           tag_name: latest
           target_commitish: ${{ github.sha }}
           make_latest: true
-          name: Golf Tracker (latest build)
+          name: Happy Caddie (latest build)
           body: |
-            Personal Golf Shot Tracker APK.
+            Happy Caddie — personal golf shot tracker APK.
 
             **Install on Android:**
             1. Tap `golf-tracker.apk` below to download it on your phone.
