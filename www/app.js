@@ -249,7 +249,16 @@ const State = {
       this.pendingShot = saved.pendingShot ?? false;
       this.currentClub = saved.currentClub ?? null;
     }
+    this.normalizeCourses();
     this.applyCourseOverrides();
+  },
+
+  // When a hole has a real green polygon center, use it as the pin so every
+  // pin-based feature (distances, rangefinder, map) gets the accurate point.
+  normalizeCourses() {
+    COURSES.forEach(c => c.holes.forEach(hd => {
+      if (hd.green && hd.green.center) hd.pin = { ...hd.green.center };
+    }));
   },
 
   // Merge user-corrected coordinates onto the static course data (in memory).
@@ -298,16 +307,20 @@ const State = {
   },
   get course() { return COURSES.find(c => c.id === this.round?.courseId); },
 
-  // Front / Center / Back of the green. The stored `pin` is treated as center;
-  // front/back are offset ~16 yds along the tee→green line (≈32 yd deep green).
+  // Front / Center / Back of the green. If real green points are present in the
+  // course data, use them; otherwise treat `pin` as center and offset front/back
+  // ~16 yds along the tee→green line (≈32 yd deep green).
   greenPoints(hd = this.holeData) {
     if (!hd) return null;
-    const b = bearingDeg(hd.tee.lat, hd.tee.lon, hd.pin.lat, hd.pin.lon);
+    const g = hd.green;
+    if (g && g.front && g.center && g.back) return { front: { ...g.front }, center: { ...g.center }, back: { ...g.back } };
+    const center = g?.center || hd.pin;
+    const b = bearingDeg(hd.tee.lat, hd.tee.lon, center.lat, center.lon);
     const half = 16;
     return {
-      front:  destinationPoint(hd.pin.lat, hd.pin.lon, (b + 180) % 360, half),
-      center: { lat: hd.pin.lat, lon: hd.pin.lon },
-      back:   destinationPoint(hd.pin.lat, hd.pin.lon, b, half)
+      front:  destinationPoint(center.lat, center.lon, (b + 180) % 360, half),
+      center: { lat: center.lat, lon: center.lon },
+      back:   destinationPoint(center.lat, center.lon, b, half)
     };
   },
 
@@ -334,6 +347,16 @@ const State = {
     }));
   },
 
+  // Real mapped hazards on the hole (bunkers, water) as actual points.
+  hazardTargets(hd = this.holeData) {
+    if (!hd || !Array.isArray(hd.hazards)) return [];
+    return hd.hazards.map(h => ({
+      type: h.type || 'hazard',
+      label: h.label || (h.type === 'water' ? 'Water' : 'Bunker'),
+      point: { lat: h.lat, lon: h.lon }
+    }));
+  },
+
   // Aim-able points for the rangefinder reticle. The green's front/center/back
   // sit on your line of play (same bearing), so they can't be told apart by aim
   // — the green is a single "Pin" target. Off-axis points (carries, hazards,
@@ -342,6 +365,7 @@ const State = {
     const targets = [];
     const hd = this.holeData;
     if (hd) targets.push({ label: 'Pin', point: { lat: hd.pin.lat, lon: hd.pin.lon }, primary: true });
+    for (const h of this.hazardTargets()) targets.push({ label: h.label, point: h.point });
     for (const c of this.carryTargets()) targets.push({ label: c.label, point: c.point });
     for (const l of this.layupTargets()) targets.push({ label: l.label, point: l.point });
     return targets;
@@ -838,6 +862,7 @@ const UI = {
     const pinP = AS(pin.lat, pin.lon);
     const carries = State.carryTargets(hd).map(c => ({ label: c.label, p: AS(c.point.lat, c.point.lon) }));
     const layups = State.layupTargets(hd).map(c => ({ label: c.label, p: AS(c.point.lat, c.point.lon) }));
+    const hazards = State.hazardTargets(hd).map(h => ({ type: h.type, p: AS(h.point.lat, h.point.lon) }));
     const shots = (State.hole?.shots || []).map((s, i) => ({ p: AS(s.lat, s.lon), n: i + 1 }));
     const cur = GPS.pos ? AS(GPS.pos.lat, GPS.pos.lon) : null;
 
@@ -860,6 +885,7 @@ const UI = {
     // bounds
     const pts = [teeP, pinP, { a: pinP.a + greenR, s: pinP.s }, { a: pinP.a - greenR, s: pinP.s }, { a: pinP.a, s: pinP.s + greenR }, { a: pinP.a, s: pinP.s - greenR }];
     carries.forEach(c => pts.push(c.p)); layups.forEach(l => pts.push(l.p)); shots.forEach(s => pts.push(s.p));
+    hazards.forEach(h => pts.push(h.p));
     if (cur) pts.push(cur);
     if (disp) { const r = disp.depth + disp.lateral; pts.push({ a: disp.center.a + r, s: disp.center.s }, { a: disp.center.a - r, s: disp.center.s }, { a: disp.center.a, s: disp.center.s + r }, { a: disp.center.a, s: disp.center.s - r }); }
     let minA = 1e9, maxA = -1e9, minS = 1e9, maxS = -1e9;
@@ -888,7 +914,9 @@ const UI = {
     // green + flag
     svg += `<circle cx="${f(X(pinP))}" cy="${f(Y(pinP))}" r="${f(Math.max(9, greenR * scale))}" fill="#7ec96a" stroke="#fff" stroke-opacity="0.5"/>`;
     svg += `<line x1="${f(X(pinP))}" y1="${f(Y(pinP))}" x2="${f(X(pinP))}" y2="${f(Y(pinP) - 18)}" stroke="#fff" stroke-width="1.5"/><polygon points="${f(X(pinP))},${f(Y(pinP) - 18)} ${f(X(pinP) + 11)},${f(Y(pinP) - 14)} ${f(X(pinP))},${f(Y(pinP) - 10)}" fill="#e23b3b"/>`;
-    // hazards / layups
+    // real mapped hazards (bunkers gold, water blue)
+    hazards.forEach(h => { const col = h.type === 'water' ? '#3da5ff' : '#e0c060'; svg += `<circle cx="${f(X(h.p))}" cy="${f(Y(h.p))}" r="6.5" fill="${col}" fill-opacity="0.85" stroke="#0a0a0a" stroke-opacity="0.5"/>`; });
+    // carry / layup markers
     carries.forEach(c => { svg += `<circle cx="${f(X(c.p))}" cy="${f(Y(c.p))}" r="6" fill="#e0c060" stroke="#7a6a20"/>`; });
     layups.forEach(l => { svg += `<circle cx="${f(X(l.p))}" cy="${f(Y(l.p))}" r="4.5" fill="none" stroke="#cfe8c0" stroke-dasharray="2 2"/>`; });
     // shot trail
@@ -967,7 +995,8 @@ const UI = {
   renderHazards() {
     const el = this.$('hazards-list');
     if (!el) return;
-    const items = [...State.carryTargets(), ...State.layupTargets()];
+    const haz = State.hazardTargets().map(h => ({ label: (h.type === 'water' ? '💧 ' : '🟡 ') + h.label, point: h.point }));
+    const items = [...haz, ...State.carryTargets(), ...State.layupTargets()];
     if (!items.length) { el.innerHTML = '<div class="haz-hint">No marked hazards or layups on this hole</div>'; return; }
     if (!GPS.pos) { el.innerHTML = '<div class="haz-hint">Waiting for GPS…</div>'; return; }
     el.innerHTML = items.map(it => {
@@ -1460,11 +1489,13 @@ const UI = {
       pts.push([lat, lon]); return m;
     };
     // tee + pin (draggable in edit mode)
-    add(hd.tee.lat, hd.tee.lon, this._satIcon('⛳', 'sat-tee'), false);
     add(hd.tee.lat, hd.tee.lon, this._satIcon('<div style="background:#dcdcdc;color:#143020;border-radius:4px;padding:0 3px">T</div>'), this._satEdit,
       ll => this._saveSatPoint('tee', ll));
     add(hd.pin.lat, hd.pin.lon, this._satIcon('<div style="font-size:18px">🚩</div>'), this._satEdit,
       ll => this._saveSatPoint('pin', ll));
+    // mapped hazards
+    State.hazardTargets(hd).forEach(h => add(h.point.lat, h.point.lon,
+      this._satIcon(`<div style="font-size:15px">${h.type === 'water' ? '💧' : '🟡'}</div>`), false));
     // shots this hole
     (State.hole?.shots || []).forEach((s, i) => add(s.lat, s.lon, this._satIcon(`<div style="background:#0e2417;border:1px solid #fff;border-radius:50%;width:18px;height:18px;line-height:18px">${i + 1}</div>`), false));
     // current position
