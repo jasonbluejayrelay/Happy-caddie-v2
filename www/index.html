@@ -348,6 +348,7 @@ html, body {
 .round-score { font-size: 26px; font-weight: 900; color: var(--text); }
 .round-score small { font-size: 14px; color: var(--muted); font-weight: 600; }
 .round-meta { line-height: 1.4; }
+.round-share { padding: 6px 10px; }
 .round-date { font-size: 13px; font-weight: 600; }
 .round-course { font-size: 11px; color: var(--muted); }
 .round-stats { display: flex; flex-direction: column; gap: 2px; text-align: right; }
@@ -696,6 +697,7 @@ select option { background: var(--card); }
   <!-- ── SCORECARD TAB ── -->
   <div class="tab-pane" data-tab="scorecard" style="display:none;flex:1;overflow-y:auto">
     <div style="padding:12px">
+      <button class="btn btn-accent btn-block btn-sm" style="margin-bottom:10px" onclick="UI.shareCurrentScorecard()">📤 Share Scorecard</button>
       <div id="scorecard-table"></div>
     </div>
   </div>
@@ -920,6 +922,18 @@ select option { background: var(--card); }
       <button class="btn btn-danger" style="flex:1" onclick="UI.deleteShotEdit()">Delete</button>
       <button class="btn btn-ghost" style="flex:1" onclick="UI.closeShotEdit()">Cancel</button>
       <button class="btn btn-accent" style="flex:1" onclick="UI.saveShotEdit()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ SHARE SCORECARD MODAL ═══════════════════ -->
+<div id="card-modal" class="modal-overlay">
+  <div class="modal" style="max-height:94vh;overflow-y:auto;text-align:center">
+    <img id="card-img" alt="Scorecard" style="width:100%;border-radius:14px;display:block">
+    <div style="display:flex;gap:10px;margin-top:14px">
+      <button class="btn btn-ghost" style="flex:1" onclick="UI.closeCard()">Close</button>
+      <button class="btn btn-primary" style="flex:1" onclick="UI.downloadCard()">⬇ Save</button>
+      <button class="btn btn-accent" style="flex:1" onclick="UI.shareCardImage()">📤 Share</button>
     </div>
   </div>
 </div>

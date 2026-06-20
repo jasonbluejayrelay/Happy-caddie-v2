@@ -1223,12 +1223,15 @@ const UI = {
       Speak.say(`Hole ${State.holeIdx + 1}, par ${State.holeData?.par ?? ''}`);
       UI.switchTab('hole');
     } else {
+      const finished = State.round; // capture before finishRound() clears it
       State.finishRound();
       WakeLock.off();
       UI.toast('Round complete! Great game!', 'success', 4000);
       Speak.say('Round complete. Great game!');
       UI.showView('home');
       UI.renderHome();
+      // Offer the shareable scorecard.
+      UI.showScorecardShare(finished);
     }
   },
 
@@ -1604,7 +1607,7 @@ const UI = {
         </div>
         <div style="font-size:11px;color:var(--muted);margin-top:8px">*Rough estimate from score vs. par — not an official handicap.</div>
       </div>
-      ${summaries.map(s => `
+      ${summaries.map((s, i) => `
         <div class="round-card">
           <div class="round-main">
             <div class="round-score">${s.total ?? '—'} ${s.vsPar != null ? `<small>(${sign(s.vsPar)})</small>` : ''}</div>
@@ -1612,6 +1615,7 @@ const UI = {
               <div class="round-date">${s.date}${s.complete ? '' : ` · ${s.holesScored} holes`}</div>
               <div class="round-course">${s.courseName}</div>
             </div>
+            <button class="btn btn-ghost btn-sm round-share" onclick="UI.shareHistoryRound(${i})" title="Share scorecard">📤</button>
           </div>
           <div class="round-stats">
             ${s.gir != null ? `<span>GIR ${s.gir}%</span>` : ''}
@@ -1624,6 +1628,133 @@ const UI = {
         Clear Round History
       </button>`;
   },
+
+  // ── Shareable scorecard image ────────────────────────────────────────────
+  _scorecardCanvas(round) {
+    return new Promise(resolve => {
+      const course = COURSES.find(c => c.id === round.courseId);
+      const me = round.players.find(p => p.isMe) || round.players[0];
+      const myId = me?.id;
+      const S = summarizeRound(round);
+      const sc = 2, w = 560, h = 600, pad = 28;
+      const cv = document.createElement('canvas');
+      cv.width = w * sc; cv.height = h * sc;
+      const x = cv.getContext('2d'); x.scale(sc, sc);
+      const font = (s, wt) => `${wt || ''} ${s}px -apple-system, "Segoe UI", Roboto, sans-serif`;
+      const rr = (X, Y, W, H, R) => { x.beginPath(); x.moveTo(X + R, Y); x.arcTo(X + W, Y, X + W, Y + H, R); x.arcTo(X + W, Y + H, X, Y + H, R); x.arcTo(X, Y + H, X, Y, R); x.arcTo(X, Y, X + W, Y, R); x.closePath(); };
+      const text = (t, X, Y, s, col, wt, al) => { x.fillStyle = col; x.font = font(s, wt); x.textAlign = al || 'left'; x.fillText(t, X, Y); };
+      const scoreColor = d => d == null ? null : d <= -2 ? '#f2c14e' : d === -1 ? '#e0625f' : d === 0 ? null : d === 1 ? '#3f7fb3' : '#27496b';
+
+      // background
+      const g = x.createLinearGradient(0, 0, 0, h);
+      g.addColorStop(0, '#1b5733'); g.addColorStop(1, '#0b2616');
+      x.fillStyle = g; x.fillRect(0, 0, w, h);
+
+      const draw = () => {
+        x.textBaseline = 'alphabetic';
+        // course + meta
+        text(course?.name || 'Round', pad, 100, 25, '#ffffff', '800');
+        const teeName = course?.tees.find(t => t.id === round.tee)?.name || round.tee || '';
+        text(`${S.date}   ·   ${me?.name || 'Me'}   ·   ${teeName} tees`, pad, 122, 13, 'rgba(255,255,255,.75)', '600');
+
+        // hero score box
+        rr(pad, 138, w - 2 * pad, 92, 16); x.fillStyle = 'rgba(255,255,255,.08)'; x.fill();
+        text(String(S.total ?? '—'), pad + 24, 205, 56, '#ffffff', '900');
+        text('STROKES', pad + 27, 222, 11, 'rgba(255,255,255,.55)', '700');
+        const vp = S.vsPar;
+        const pill = vp == null ? 'E' : vp === 0 ? 'E' : vp > 0 ? `+${vp}` : `${vp}`;
+        const pcol = vp == null ? '#9fb0a6' : vp < 0 ? '#e0625f' : vp === 0 ? '#7ec96a' : '#6fb1e0';
+        x.font = font(26, '900'); const pw = x.measureText(pill).width + 40;
+        rr(w - pad - 20 - pw, 158, pw, 46, 23); x.fillStyle = pcol; x.fill();
+        text(pill, w - pad - 20 - pw / 2, 190, 24, '#0b2616', '900', 'center');
+        text('vs par', w - pad - 20 - pw / 2, 220, 11, 'rgba(255,255,255,.6)', '700', 'center');
+
+        // stat pills
+        const stats = [['GIR', S.gir != null ? S.gir + '%' : '—'], ['Fairways', S.fir != null ? S.fir + '%' : '—'], ['Putts', S.putts != null ? String(S.putts) : '—']];
+        const sw = (w - 2 * pad - 24) / 3;
+        stats.forEach((st, i) => {
+          const X = pad + i * (sw + 12);
+          rr(X, 246, sw, 56, 12); x.fillStyle = 'rgba(255,255,255,.06)'; x.fill();
+          text(st[1], X + sw / 2, 278, 21, '#ffffff', '800', 'center');
+          text(st[0], X + sw / 2, 294, 11, 'rgba(255,255,255,.6)', '700', 'center');
+        });
+
+        // nine-hole tables
+        const cellW = (w - 2 * pad - 64) / 10, rh = 32;
+        const nine = (yTop, from, totLabel) => {
+          const rc = [yTop + rh * 0.5, yTop + rh * 1.5, yTop + rh * 2.5];
+          x.textBaseline = 'middle';
+          text('Hole', pad + 2, rc[0], 12, 'rgba(255,255,255,.55)', '700');
+          text('Par', pad + 2, rc[1], 12, 'rgba(255,255,255,.55)', '700');
+          text('You', pad + 2, rc[2], 12, 'rgba(255,255,255,.9)', '800');
+          for (let i = 0; i < 9; i++) {
+            const cx = pad + 64 + i * cellW + cellW / 2;
+            const hd = course.holes[from + i];
+            text(String(from + i + 1), cx, rc[0], 12, 'rgba(255,255,255,.55)', '700', 'center');
+            text(String(hd.par), cx, rc[1], 13, 'rgba(255,255,255,.8)', '700', 'center');
+            const sv = round.holes[from + i]?.scores[myId];
+            if (sv != null) {
+              const col = scoreColor(sv - hd.par);
+              if (col) {
+                if (sv - hd.par <= -1) { x.beginPath(); x.arc(cx, rc[2], 12, 0, 6.2832); x.fillStyle = col; x.fill(); }
+                else { rr(cx - 12, rc[2] - 12, 24, 24, 6); x.fillStyle = col; x.fill(); }
+              }
+              text(String(sv), cx, rc[2], 14, '#ffffff', '800', 'center');
+            } else text('–', cx, rc[2], 13, 'rgba(255,255,255,.4)', '700', 'center');
+          }
+          const tcx = pad + 64 + 9 * cellW + cellW / 2;
+          const slice = course.holes.slice(from, from + 9);
+          const parSum = slice.reduce((a, b) => a + b.par, 0);
+          const scSum = slice.reduce((a, _, i) => a + (round.holes[from + i]?.scores[myId] || 0), 0);
+          text(totLabel, tcx, rc[0], 12, '#f2c14e', '800', 'center');
+          text(String(parSum), tcx, rc[1], 13, '#f2c14e', '700', 'center');
+          text(scSum || '–', tcx, rc[2], 14, '#f2c14e', '800', 'center');
+          x.textBaseline = 'alphabetic';
+        };
+        nine(320, 0, 'OUT');
+        nine(424, 9, 'IN');
+
+        text('⛳ Tracked with Happy Caddie', w / 2, h - 22, 13, 'rgba(255,255,255,.7)', '700', 'center');
+        resolve(cv);
+      };
+
+      // brand row (logo + wordmark), then draw the rest
+      const img = new Image();
+      img.onload = () => { x.save(); rr(pad, 26, 40, 40, 10); x.clip(); x.drawImage(img, pad, 26, 40, 40); x.restore(); x.textBaseline = 'middle'; text('HAPPY CADDIE', pad + 52, 47, 16, '#ffffff', '800'); draw(); };
+      img.onerror = () => { x.textBaseline = 'middle'; text('HAPPY CADDIE', pad, 47, 18, '#ffffff', '800'); draw(); };
+      img.src = './icon-192.png';
+    });
+  },
+
+  async showScorecardShare(round) {
+    if (!round || !round.holes) { UI.toast('No round to share', 'error'); return; }
+    const cv = await this._scorecardCanvas(round);
+    this._cardName = `happy-caddie-${summarizeRound(round).date || 'round'}.png`;
+    await new Promise(res => cv.toBlob(b => { this._cardBlob = b; res(); }, 'image/png'));
+    this.$('card-img').src = URL.createObjectURL(this._cardBlob);
+    this.$('card-modal').style.display = 'flex';
+  },
+  closeCard() { this.$('card-modal').style.display = 'none'; },
+  async shareCardImage() {
+    if (!this._cardBlob) return;
+    const file = new File([this._cardBlob], this._cardName, { type: 'image/png' });
+    try {
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'My round', text: 'My round on Happy Caddie ⛳' });
+        return;
+      }
+    } catch {}
+    this.downloadCard();
+  },
+  downloadCard() {
+    if (!this._cardBlob) return;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(this._cardBlob); a.download = this._cardName;
+    document.body.appendChild(a); a.click(); a.remove();
+    UI.toast('Scorecard image saved', 'success');
+  },
+  shareHistoryRound(i) { this.showScorecardShare(Store.get('rounds', [])[i]); },
+  shareCurrentScorecard() { if (State.round) this.showScorecardShare(State.round); else UI.toast('No active round', 'error'); },
 
   // ── My Bag (club editor) ────────────────────────────────────────────────
   renderBag() {
