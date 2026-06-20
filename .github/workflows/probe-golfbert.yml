@@ -1,0 +1,20 @@
+name: Probe GolfBert (diagnostic)
+
+# Read-only: checks whether GolfBert hole data is fetchable automatically.
+on:
+  workflow_dispatch:
+    inputs:
+      hole:
+        description: GolfBert hole id
+        default: '17764'
+        required: true
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node tools/probe-golfbert.mjs "${{ inputs.hole }}"
