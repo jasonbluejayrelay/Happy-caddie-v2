@@ -1,4 +1,4 @@
-# Golf Shot Tracker
+# Happy Caddie
 
 A personal golf app for **North Hampton Golf Club** (Fernandina Beach, FL). Packaged as a
 native Android APK.
@@ -24,7 +24,7 @@ native Android APK.
 2. Download **`golf-tracker.apk`** directly on your Android phone.
 3. Open the downloaded file. If Android warns you, allow **"Install from unknown sources"**
    for your browser, then tap **Install**.
-4. Launch **Golf Tracker** and grant **Location** and **Camera** when asked.
+4. Launch **Happy Caddie** and grant **Location** and **Camera** when asked.
 
 Your data (club averages, rounds, scorecards) is stored on-device and persists until you
 uninstall the app.
