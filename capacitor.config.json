@@ -1,6 +1,6 @@
 {
   "appId": "com.jason.golftracker",
-  "appName": "Golf Tracker",
+  "appName": "Happy Caddie",
   "webDir": "www",
   "android": {
     "allowMixedContent": false

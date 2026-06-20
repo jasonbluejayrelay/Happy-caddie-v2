@@ -1,17 +1,15 @@
 {
-  "name": "Golf Shot Tracker",
-  "short_name": "Golf",
-  "description": "Personal golf shot tracker with rangefinder, voice commands, and team scorecard",
+  "name": "Happy Caddie",
+  "short_name": "Happy Caddie",
+  "description": "Happy Caddie — golf shot tracker with rangefinder, voice commands, and team scorecard",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0a2114",
   "theme_color": "#143020",
   "orientation": "portrait-primary",
   "icons": [
-    {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='24' fill='%231a4a2e'/><circle cx='96' cy='85' r='32' fill='white'/><rect x='94' y='115' width='4' height='52' fill='%23f5c518'/><polygon points='98,117 128,100 98,83' fill='%23f5c518'/></svg>",
-      "sizes": "192x192",
-      "type": "image/svg+xml"
-    }
+    { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

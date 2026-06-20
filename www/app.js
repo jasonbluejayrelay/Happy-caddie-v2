@@ -1270,12 +1270,12 @@ const UI = {
 
   async shareBackup() {
     const text = this.$('backup-export').value;
-    const filename = `golf-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    const filename = `happy-caddie-backup-${new Date().toISOString().slice(0, 10)}.json`;
     // Best: share as a real file (lets you save to Drive, email, Files, etc.)
     try {
       const file = new File([text], filename, { type: 'application/json' });
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: 'Golf Tracker Backup' });
+        await navigator.share({ files: [file], title: 'Happy Caddie Backup' });
         return;
       }
     } catch {}
@@ -1323,7 +1323,7 @@ const Backup = {
     let data;
     try { data = JSON.parse(jsonText); } catch { UI.toast('That text is not valid backup data', 'error'); return false; }
     if (!data || data.app !== 'golf-tracker') {
-      if (!confirm("This doesn't look like a Golf Tracker backup. Restore anyway?")) return false;
+      if (!confirm("This doesn't look like a Happy Caddie backup. Restore anyway?")) return false;
     }
     if (data.settings)  { State.settings  = data.settings;  Store.set('settings', data.settings); }
     if (data.clubs)     { State.clubs     = data.clubs;     Store.set('clubs', data.clubs); }
