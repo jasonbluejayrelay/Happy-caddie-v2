@@ -1,0 +1,43 @@
+name: Fetch app icon (Play Store)
+
+# Manually run from the Actions tab. Downloads the public icon from a Google Play
+# listing and opens a PR replacing the app/PWA icons.
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: Play Store package id or full listing URL
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Download icon from Play listing
+        run: node tools/fetch-icon.mjs "${{ inputs.package }}"
+
+      - name: Open a PR with the new icon
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if git diff --quiet; then echo "No icon change produced."; exit 0; fi
+          branch="auto/app-icon-$(date +%s)"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add resources/icon.png www/icon-192.png www/icon-512.png
+          git commit -m "Update app icon from Play Store listing"
+          git push -u origin "$branch"
+          gh pr create --base main --head "$branch" \
+            --title "Update app icon from Play Store" \
+            --body "Downloaded the icon from the provided Google Play listing. Review the image before merging." \
+            || echo "::warning::Couldn't open the PR automatically. Branch pushed: $branch — open a PR from it manually."
