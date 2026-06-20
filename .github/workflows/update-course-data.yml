@@ -44,6 +44,9 @@ jobs:
           git add www/course-data.js
           git commit -m "Update course coordinates from OpenStreetMap"
           git push -u origin "$branch"
+          # Opening the PR may be blocked by the repo's "Actions can create PRs"
+          # setting — don't fail the run if so; the branch is already pushed.
           gh pr create --base main --head "$branch" \
             --title "Course coordinates from OpenStreetMap" \
-            --body "Auto-generated tee / green (front-center-back) / hazard coordinates for **${{ inputs.query }}** from OpenStreetMap (© OpenStreetMap contributors, ODbL). Review the diff and the in-app map before merging."
+            --body "Auto-generated tee / green (front-center-back) / hazard coordinates for **${{ inputs.query }}** from OpenStreetMap (© OpenStreetMap contributors, ODbL). Review the diff and the in-app map before merging." \
+            || echo "::warning::Couldn't open the PR automatically. Branch pushed: $branch — open a PR from it manually."
