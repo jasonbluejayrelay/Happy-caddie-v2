@@ -34,12 +34,38 @@ function centroid(geom) {
 }
 const round6 = n => +n.toFixed(6);
 
-async function geocode(q) {
-  const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`;
-  const r = await fetch(url, { headers: { 'User-Agent': UA } });
-  const j = await r.json();
-  if (!j.length) throw new Error('Geocode failed for: ' + q);
-  return { lat: +j[0].lat, lon: +j[0].lon };
+async function overpassRaw(query) {
+  const r = await fetch(OVERPASS, { method: 'POST', headers: { 'User-Agent': UA, 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'data=' + encodeURIComponent(query) });
+  if (!r.ok) throw new Error('Overpass HTTP ' + r.status);
+  return (await r.json()).elements || [];
+}
+
+function bboxOf(geom) {
+  let s = 90, w = 180, n = -90, e = -180;
+  for (const p of geom) { s = Math.min(s, p.lat); n = Math.max(n, p.lat); w = Math.min(w, p.lon); e = Math.max(e, p.lon); }
+  return [s, w, n, e];
+}
+
+// Find the golf course by name directly in OSM (no geocoder dependency).
+async function findCourse(query) {
+  const kw = (query.split(',')[0] || query).replace(/\b(golf|club|course|cc|g\.?c\.?)\b/ig, '').trim() || query;
+  const region = '30.20,-82.25,31.05,-81.25'; // NE Florida (Nassau/Amelia area)
+  console.log(`Searching OSM for golf course matching "${kw}" in NE Florida…`);
+  const q = `[out:json][timeout:90];
+    (
+      way[leisure=golf_course][name~"${kw}",i](${region});
+      relation[leisure=golf_course][name~"${kw}",i](${region});
+      way[leisure=golf_course][name~"North Hampton",i](${region});
+      relation[leisure=golf_course][name~"North Hampton",i](${region});
+    );
+    out tags geom;`;
+  const els = await overpassRaw(q);
+  if (!els.length) return null;
+  const el = els.find(e => (e.geometry && e.geometry.length) || (e.members && e.members.length)) || els[0];
+  let geom = el.geometry || (el.members ? el.members.flatMap(m => m.geometry || []) : []);
+  if (!geom.length) return null;
+  console.log(`  Found: "${el.tags?.name}" (osm ${el.type}/${el.id})`);
+  return { name: el.tags?.name, bbox: bboxOf(geom) };
 }
 
 async function overpass(bbox) {
@@ -91,12 +117,16 @@ function nearestFeature(feats, lat, lon) {
 }
 
 async function main() {
-  console.log('Geocoding:', QUERY);
-  const loc = await geocode(QUERY);
-  console.log('  ->', loc);
-  const pad = 0.02; // ~2.2km
-  const bbox = [loc.lat - pad, loc.lon - pad, loc.lat + pad, loc.lon + pad].map(n => n.toFixed(5)).join(',');
-  console.log('Overpass bbox:', bbox);
+  const course0 = await findCourse(QUERY);
+  if (!course0) {
+    console.error('Could not locate the golf course in OpenStreetMap by name. ' +
+      'It may not be mapped, or the name differs. Try a different query, or map it on the Satellite view.');
+    process.exit(1);
+  }
+  const [s, w, n, e] = course0.bbox;
+  const pad = 0.0015; // small margin around the course polygon
+  const bbox = [s - pad, w - pad, n + pad, e + pad].map(x => x.toFixed(6)).join(',');
+  console.log('Course bbox:', bbox);
   const els = await overpass(bbox);
   const ways = els.filter(e => e.geometry && e.geometry.length);
   ways.forEach(w => { w._c = centroid(w.geometry); });
