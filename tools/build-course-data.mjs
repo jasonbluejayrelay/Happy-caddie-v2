@@ -46,26 +46,38 @@ function bboxOf(geom) {
   return [s, w, n, e];
 }
 
-// Find the golf course by name directly in OSM (no geocoder dependency).
+// Find the golf course in OSM by name (no geocoder dependency).
+// Optional explicit bbox via argv[3] = "s,w,n,e" skips the name search.
 async function findCourse(query) {
+  const explicit = process.argv[3];
+  if (explicit && explicit.split(',').length === 4) {
+    const [s, w, n, e] = explicit.split(',').map(Number);
+    console.log('Using explicit bbox:', explicit);
+    return { name: query, bbox: [s, w, n, e] };
+  }
   const kw = (query.split(',')[0] || query).replace(/\b(golf|club|course|cc|g\.?c\.?)\b/ig, '').trim() || query;
-  const region = '30.20,-82.25,31.05,-81.25'; // NE Florida (Nassau/Amelia area)
-  console.log(`Searching OSM for golf course matching "${kw}" in NE Florida…`);
-  const q = `[out:json][timeout:90];
+  const region = '24.40,-87.70,31.10,-79.90'; // all of Florida
+  console.log(`Searching OSM for a golf course matching "${kw}" across Florida…`);
+  const q = `[out:json][timeout:120];
     (
       way[leisure=golf_course][name~"${kw}",i](${region});
       relation[leisure=golf_course][name~"${kw}",i](${region});
-      way[leisure=golf_course][name~"North Hampton",i](${region});
-      relation[leisure=golf_course][name~"North Hampton",i](${region});
     );
     out tags geom;`;
   const els = await overpassRaw(q);
-  if (!els.length) return null;
-  const el = els.find(e => (e.geometry && e.geometry.length) || (e.members && e.members.length)) || els[0];
-  let geom = el.geometry || (el.members ? el.members.flatMap(m => m.geometry || []) : []);
-  if (!geom.length) return null;
-  console.log(`  Found: "${el.tags?.name}" (osm ${el.type}/${el.id})`);
-  return { name: el.tags?.name, bbox: bboxOf(geom) };
+  const withGeom = els.filter(e => (e.geometry && e.geometry.length) || (e.members && e.members.length));
+  if (withGeom.length) {
+    const el = withGeom[0];
+    const geom = el.geometry || el.members.flatMap(m => m.geometry || []);
+    console.log(`  Found: "${el.tags?.name}" (osm ${el.type}/${el.id})`);
+    return { name: el.tags?.name, bbox: bboxOf(geom) };
+  }
+  // Diagnostic: list golf courses mapped near Fernandina Beach so we know what's there.
+  console.log('  No name match. Listing golf courses mapped in NE Florida for reference:');
+  const near = await overpassRaw(`[out:json][timeout:90];(way[leisure=golf_course](30.20,-82.30,30.95,-81.25);relation[leisure=golf_course](30.20,-82.30,30.95,-81.25););out tags center;`);
+  for (const g of near) console.log(`   - ${g.tags?.name || '(unnamed)'} [osm ${g.type}/${g.id}]`);
+  if (!near.length) console.log('   (none found in NE Florida)');
+  return null;
 }
 
 async function overpass(bbox) {
