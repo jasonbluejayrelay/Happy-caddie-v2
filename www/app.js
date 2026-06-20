@@ -561,6 +561,7 @@ const UI = {
   rangefinderOpen: false,
   cameraStream: null,
   compassHeading: null,
+  mapCollapsed: false,
 
   $: id => document.getElementById(id),
   show: id => { const el = document.getElementById(id); if (el) el.style.display = ''; },
@@ -693,6 +694,9 @@ const UI = {
 
     // Hazards & layups
     this.renderHazards();
+
+    // Hole map
+    this.renderHoleMap();
   },
 
   updatePinDistance() {
@@ -712,6 +716,101 @@ const UI = {
       fEl.textContent = cEl.textContent = bEl.textContent = '—';
       accEl.textContent = 'No GPS';
     }
+    this.renderHoleMap();
+  },
+
+  // ── Hole map (top-down schematic: layout, your shot trail, landing zone) ──
+  toggleHoleMap() {
+    this.mapCollapsed = !this.mapCollapsed;
+    const m = this.$('hole-map'), t = this.$('map-toggle');
+    if (m) m.style.display = this.mapCollapsed ? 'none' : '';
+    if (t) t.textContent = this.mapCollapsed ? '▸' : '▾';
+    if (!this.mapCollapsed) this.renderHoleMap();
+  },
+
+  renderHoleMap() {
+    const el = this.$('hole-map');
+    if (!el || this.mapCollapsed) return;
+    const hd = State.holeData;
+    if (!hd) { el.innerHTML = ''; return; }
+    const tee = hd.tee, pin = hd.pin;
+    const b = bearingDeg(tee.lat, tee.lon, pin.lat, pin.lon) * Math.PI / 180;
+    const fE = Math.sin(b), fN = Math.cos(b), rE = Math.cos(b), rN = -Math.sin(b);
+    const yPerDeg = 111320 * 1.09361, cosLat = Math.cos(tee.lat * Math.PI / 180);
+    // lat/lon -> (along tee→green, side) in yards
+    const AS = (lat, lon) => {
+      const north = (lat - tee.lat) * yPerDeg;
+      const east = (lon - tee.lon) * yPerDeg * cosLat;
+      return { a: east * fE + north * fN, s: east * rE + north * rN };
+    };
+    const greenR = 16;
+    const teeP = AS(tee.lat, tee.lon);
+    const pinP = AS(pin.lat, pin.lon);
+    const carries = State.carryTargets(hd).map(c => ({ label: c.label, p: AS(c.point.lat, c.point.lon) }));
+    const layups = State.layupTargets(hd).map(c => ({ label: c.label, p: AS(c.point.lat, c.point.lon) }));
+    const shots = (State.hole?.shots || []).map((s, i) => ({ p: AS(s.lat, s.lon), n: i + 1 }));
+    const cur = GPS.pos ? AS(GPS.pos.lat, GPS.pos.lon) : null;
+
+    // Landing-zone (dispersion) for the selected/suggested club from current pos.
+    let disp = null;
+    if (cur) {
+      let clubId = State.currentClub;
+      if (!clubId && GPS.pos) { const sug = State.topSuggestions(Math.round(GPS.distanceTo(pin.lat, pin.lon))); clubId = sug[0]?.club.id; }
+      const arr = clubId ? State.clubStats[clubId] : null;
+      if (arr && arr.length >= 3) {
+        const mean = arr.reduce((x, y) => x + y, 0) / arr.length;
+        const sd = Math.sqrt(arr.reduce((x, y) => x + (y - mean) ** 2, 0) / arr.length);
+        const dirA = pinP.a - cur.a, dirS = pinP.s - cur.s;
+        const dlen = Math.hypot(dirA, dirS) || 1;
+        const center = { a: cur.a + dirA / dlen * mean, s: cur.s + dirS / dlen * mean };
+        disp = { center, depth: Math.max(8, sd), lateral: Math.max(6, mean * 0.06), mean: Math.round(mean), club: clubId };
+      }
+    }
+
+    // bounds
+    const pts = [teeP, pinP, { a: pinP.a + greenR, s: pinP.s }, { a: pinP.a - greenR, s: pinP.s }, { a: pinP.a, s: pinP.s + greenR }, { a: pinP.a, s: pinP.s - greenR }];
+    carries.forEach(c => pts.push(c.p)); layups.forEach(l => pts.push(l.p)); shots.forEach(s => pts.push(s.p));
+    if (cur) pts.push(cur);
+    if (disp) { const r = disp.depth + disp.lateral; pts.push({ a: disp.center.a + r, s: disp.center.s }, { a: disp.center.a - r, s: disp.center.s }, { a: disp.center.a, s: disp.center.s + r }, { a: disp.center.a, s: disp.center.s - r }); }
+    let minA = 1e9, maxA = -1e9, minS = 1e9, maxS = -1e9;
+    pts.forEach(p => { minA = Math.min(minA, p.a); maxA = Math.max(maxA, p.a); minS = Math.min(minS, p.s); maxS = Math.max(maxS, p.s); });
+    if (maxS - minS < 70) { const c = (maxS + minS) / 2; minS = c - 35; maxS = c + 35; }
+    if (maxA - minA < 70) { const c = (maxA + minA) / 2; minA = c - 35; maxA = c + 35; }
+
+    const W = 320, H = 460, pad = 26;
+    const scale = Math.min((W - 2 * pad) / (maxS - minS), (H - 2 * pad) / (maxA - minA));
+    const offX = pad + ((W - 2 * pad) - (maxS - minS) * scale) / 2;
+    const offY = pad + ((H - 2 * pad) - (maxA - minA) * scale) / 2;
+    const X = p => offX + (p.s - minS) * scale;
+    const Y = p => (H - offY) - (p.a - minA) * scale; // along increases upward
+    const f = n => n.toFixed(1);
+
+    let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
+    svg += `<rect width="${W}" height="${H}" rx="14" fill="#15321e"/>`;
+    // fairway corridor
+    svg += `<line x1="${f(X(teeP))}" y1="${f(Y(teeP))}" x2="${f(X(pinP))}" y2="${f(Y(pinP))}" stroke="#2f7a44" stroke-width="${f(Math.max(12, 44 * scale))}" stroke-linecap="round" opacity="0.5"/>`;
+    // landing zone
+    if (disp) {
+      const ang = Math.atan2(Y(pinP) - Y(cur), X(pinP) - X(cur)) * 180 / Math.PI;
+      svg += `<g transform="translate(${f(X(disp.center))} ${f(Y(disp.center))}) rotate(${f(ang)})"><ellipse rx="${f(disp.depth * scale)}" ry="${f(disp.lateral * scale)}" fill="#f5c518" opacity="0.22" stroke="#f5c518" stroke-opacity="0.55"/></g>`;
+      svg += `<text x="${f(X(disp.center))}" y="${f(Y(disp.center) - 4)}" text-anchor="middle" font-size="11" fill="#f5d04a">${(State.clubs.find(c => c.id === disp.club) || {}).name || ''} ~${disp.mean}y</text>`;
+    }
+    // green + flag
+    svg += `<circle cx="${f(X(pinP))}" cy="${f(Y(pinP))}" r="${f(Math.max(9, greenR * scale))}" fill="#7ec96a" stroke="#fff" stroke-opacity="0.5"/>`;
+    svg += `<line x1="${f(X(pinP))}" y1="${f(Y(pinP))}" x2="${f(X(pinP))}" y2="${f(Y(pinP) - 18)}" stroke="#fff" stroke-width="1.5"/><polygon points="${f(X(pinP))},${f(Y(pinP) - 18)} ${f(X(pinP) + 11)},${f(Y(pinP) - 14)} ${f(X(pinP))},${f(Y(pinP) - 10)}" fill="#e23b3b"/>`;
+    // hazards / layups
+    carries.forEach(c => { svg += `<circle cx="${f(X(c.p))}" cy="${f(Y(c.p))}" r="6" fill="#e0c060" stroke="#7a6a20"/>`; });
+    layups.forEach(l => { svg += `<circle cx="${f(X(l.p))}" cy="${f(Y(l.p))}" r="4.5" fill="none" stroke="#cfe8c0" stroke-dasharray="2 2"/>`; });
+    // shot trail
+    const trail = [teeP, ...shots.map(s => s.p)];
+    if (trail.length > 1) svg += `<polyline points="${trail.map(p => `${f(X(p))},${f(Y(p))}`).join(' ')}" fill="none" stroke="#fff" stroke-width="2" stroke-opacity="0.85" stroke-dasharray="1 5" stroke-linecap="round"/>`;
+    shots.forEach(s => { svg += `<circle cx="${f(X(s.p))}" cy="${f(Y(s.p))}" r="7.5" fill="#0e2417" stroke="#fff"/><text x="${f(X(s.p))}" y="${f(Y(s.p) + 3)}" text-anchor="middle" font-size="9" fill="#fff">${s.n}</text>`; });
+    // tee
+    svg += `<rect x="${f(X(teeP) - 7)}" y="${f(Y(teeP) - 5)}" width="14" height="10" rx="2" fill="#dcdcdc"/><text x="${f(X(teeP))}" y="${f(Y(teeP) + 3)}" text-anchor="middle" font-size="8" fill="#143020">T</text>`;
+    // current position
+    if (cur) svg += `<circle cx="${f(X(cur))}" cy="${f(Y(cur))}" r="10" fill="#3da5ff" opacity="0.25"/><circle cx="${f(X(cur))}" cy="${f(Y(cur))}" r="4.5" fill="#3da5ff" stroke="#fff"/>`;
+    svg += `</svg>`;
+    el.innerHTML = svg;
   },
 
   updateClubSuggestion(yards) {

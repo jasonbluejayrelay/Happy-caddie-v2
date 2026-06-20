@@ -206,6 +206,15 @@ html, body {
 .sug-best { color: var(--accent); font-weight: 700; background: rgba(76,175,120,0.12); }
 
 /* ── Club Selector ────────────────────────────── */
+.hole-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.map-section { border-bottom: 1px solid var(--border); background: var(--bg); }
+.map-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.map-toggle { color: var(--muted); font-size: 12px; }
+.hole-map { padding: 2px 12px 12px; }
+.hole-map svg { width: 100%; height: auto; display: block; border-radius: 14px; max-height: 52vh; }
 .club-section { padding: 10px 16px 4px; flex-shrink: 0; }
 .club-section-label { font-size: 11px; text-transform: uppercase; color: var(--muted); letter-spacing: 0.5px; margin-bottom: 6px; }
 #club-selector {
@@ -578,6 +587,18 @@ select option { background: var(--card); }
       </div>
     </div>
 
+    <!-- Scrollable middle (header + distances above, action bar below stay put) -->
+    <div class="hole-scroll">
+
+    <!-- Hole map -->
+    <div class="map-section">
+      <div class="map-head" onclick="UI.toggleHoleMap()">
+        <span>🗺 Hole Map</span>
+        <span id="map-toggle" class="map-toggle">▾</span>
+      </div>
+      <div id="hole-map" class="hole-map"></div>
+    </div>
+
     <!-- Shot status -->
     <div class="shot-status-bar" id="shot-status">Select a club to start</div>
 
@@ -611,6 +632,8 @@ select option { background: var(--card); }
         <button class="btn btn-ghost btn-sm" onclick="UI.changePutts(1)">+</button>
       </div>
     </div>
+
+    </div><!-- /hole-scroll -->
 
     <!-- Action buttons -->
     <div class="action-bar">
