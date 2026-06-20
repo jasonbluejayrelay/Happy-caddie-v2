@@ -1,4 +1,4 @@
-const CACHE = 'golf-v15';
+const CACHE = 'golf-v16';
 const ASSETS = ['./index.html', './app.js', './course-data.js', './manifest.json', './icon-192.png', './icon-512.png', './vendor/leaflet/leaflet.js', './vendor/leaflet/leaflet.css'];
 
 self.addEventListener('install', e =>
