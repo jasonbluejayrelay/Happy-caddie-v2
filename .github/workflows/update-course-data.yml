@@ -9,6 +9,10 @@ on:
         description: Course search (name + town)
         default: North Hampton Golf Club, Fernandina Beach, FL
         required: true
+      bbox:
+        description: 'Optional explicit area "south,west,north,east" (skips name search)'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -24,7 +28,7 @@ jobs:
           node-version: '20'
 
       - name: Build course data from OpenStreetMap
-        run: node tools/build-course-data.mjs "${{ inputs.query }}"
+        run: node tools/build-course-data.mjs "${{ inputs.query }}" "${{ inputs.bbox }}"
 
       - name: Open a pull request with the new coordinates
         env:
