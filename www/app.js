@@ -228,6 +228,8 @@ const State = {
   rounds: Store.get('rounds', []),
   settings: Store.get('settings', { playerName: 'Jason', tee: 'blue', units: 'yards' }),
   clubStats: Store.get('clubStats', {}), // { clubId: [distance, ...] }
+  // User-corrected hole coordinates: { courseId: { holeIdx: { tee:{lat,lon}, pin:{lat,lon} } } }
+  courseOverrides: Store.get('courseOverrides', {}),
 
   // Active round (in memory + localStorage backup)
   round: null,  // { courseId, tee, date, players, teams, holes: [{scores:{}, shots:[]}] }
@@ -247,6 +249,35 @@ const State = {
       this.pendingShot = saved.pendingShot ?? false;
       this.currentClub = saved.currentClub ?? null;
     }
+    this.applyCourseOverrides();
+  },
+
+  // Merge user-corrected coordinates onto the static course data (in memory).
+  applyCourseOverrides() {
+    for (const [courseId, holes] of Object.entries(this.courseOverrides || {})) {
+      const course = COURSES.find(c => c.id === courseId);
+      if (!course) continue;
+      for (const [idx, pts] of Object.entries(holes)) {
+        const hd = course.holes[+idx];
+        if (!hd) continue;
+        if (pts.tee) hd.tee = { ...pts.tee };
+        if (pts.pin) hd.pin = { ...pts.pin };
+      }
+    }
+  },
+
+  // Persist a corrected tee/pin and apply it immediately.
+  setHolePoint(holeIdx, key, lat, lon) {
+    const courseId = this.round?.courseId || COURSES[0].id;
+    const course = COURSES.find(c => c.id === courseId);
+    const hd = course?.holes[holeIdx];
+    if (!hd || (key !== 'tee' && key !== 'pin')) return;
+    hd[key] = { lat, lon };
+    const o = this.courseOverrides;
+    (o[courseId] = o[courseId] || {});
+    (o[courseId][holeIdx] = o[courseId][holeIdx] || {});
+    o[courseId][holeIdx][key] = { lat, lon };
+    Store.set('courseOverrides', o);
   },
 
   saveActive() {
@@ -1363,6 +1394,101 @@ const UI = {
     if (this.rangefinderOpen) requestAnimationFrame(() => this.updateRangefinder());
   },
 
+  // ── Satellite view (Leaflet + Esri imagery; tap-to-correct coordinates) ──
+  _satEdit: false,
+
+  _loadLeaflet() {
+    if (window.L) return Promise.resolve(true);
+    if (this._leafletLoading) return this._leafletLoading;
+    this._leafletLoading = new Promise(resolve => {
+      const css = document.createElement('link');
+      css.rel = 'stylesheet'; css.href = './vendor/leaflet/leaflet.css';
+      document.head.appendChild(css);
+      const js = document.createElement('script');
+      js.src = './vendor/leaflet/leaflet.js';
+      js.onload = () => resolve(true);
+      js.onerror = () => resolve(false);
+      document.head.appendChild(js);
+    });
+    return this._leafletLoading;
+  },
+
+  async openSatellite() {
+    const ov = this.$('sat-overlay');
+    ov.style.display = 'block';
+    this.satOpen = true;
+    const hd = State.holeData;
+    const msg = this.$('sat-msg');
+    this.$('sat-title').textContent = hd ? `Hole ${hd.number} · Par ${hd.par}` : 'Hole';
+    const show = t => { msg.textContent = t; msg.style.display = 'flex'; };
+    msg.style.display = 'none';
+    if (!hd) { show('No hole selected.'); return; }
+    const ok = await this._loadLeaflet();
+    if (!ok || !window.L) { show('Could not load the map library.'); return; }
+    if (!navigator.onLine) show('🛰 Satellite imagery needs an internet connection.\nMarkers still show; reconnect to load imagery.');
+    this._initSatMap();
+    this._renderSatMarkers(true);
+    this.$('sat-hint').style.display = this._satEdit ? 'block' : 'none';
+  },
+
+  closeSatellite() {
+    this.satOpen = false;
+    this.$('sat-overlay').style.display = 'none';
+  },
+
+  _initSatMap() {
+    if (this._satMap) { setTimeout(() => this._satMap.invalidateSize(), 60); return; }
+    const map = L.map('sat-map', { zoomControl: true, attributionControl: true });
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 21, maxNativeZoom: 19, attribution: 'Imagery © Esri'
+    }).addTo(map);
+    this._satMap = map;
+    this._satLayer = L.layerGroup().addTo(map);
+    setTimeout(() => map.invalidateSize(), 60);
+  },
+
+  _satIcon(html, cls) { return L.divIcon({ className: 'sat-mk ' + (cls || ''), html, iconSize: [22, 22] }); },
+
+  _renderSatMarkers(fit) {
+    const map = this._satMap; if (!map) return;
+    this._satLayer.clearLayers();
+    const hd = State.holeData; if (!hd) return;
+    const pts = [];
+    const add = (lat, lon, icon, drag, onEnd) => {
+      const m = L.marker([lat, lon], { icon, draggable: !!drag }).addTo(this._satLayer);
+      if (drag && onEnd) m.on('dragend', e => onEnd(e.target.getLatLng()));
+      pts.push([lat, lon]); return m;
+    };
+    // tee + pin (draggable in edit mode)
+    add(hd.tee.lat, hd.tee.lon, this._satIcon('⛳', 'sat-tee'), false);
+    add(hd.tee.lat, hd.tee.lon, this._satIcon('<div style="background:#dcdcdc;color:#143020;border-radius:4px;padding:0 3px">T</div>'), this._satEdit,
+      ll => this._saveSatPoint('tee', ll));
+    add(hd.pin.lat, hd.pin.lon, this._satIcon('<div style="font-size:18px">🚩</div>'), this._satEdit,
+      ll => this._saveSatPoint('pin', ll));
+    // shots this hole
+    (State.hole?.shots || []).forEach((s, i) => add(s.lat, s.lon, this._satIcon(`<div style="background:#0e2417;border:1px solid #fff;border-radius:50%;width:18px;height:18px;line-height:18px">${i + 1}</div>`), false));
+    // current position
+    if (GPS.pos) {
+      L.circleMarker([GPS.pos.lat, GPS.pos.lon], { radius: 6, color: '#fff', weight: 2, fillColor: '#3da5ff', fillOpacity: 1 }).addTo(this._satLayer);
+      pts.push([GPS.pos.lat, GPS.pos.lon]);
+    }
+    if (fit && pts.length) map.fitBounds(L.latLngBounds(pts).pad(0.35), { animate: false });
+  },
+
+  toggleSatEdit() {
+    this._satEdit = !this._satEdit;
+    this.$('sat-edit-btn').textContent = this._satEdit ? '✓ Done' : '✎ Edit';
+    this.$('sat-hint').style.display = this._satEdit ? 'block' : 'none';
+    this.$('sat-hint').textContent = 'Drag the T (tee) and 🚩 (green) onto the right spots, then tap Done. Fixes distances everywhere.';
+    this._renderSatMarkers(false);
+  },
+
+  _saveSatPoint(key, latlng) {
+    State.setHolePoint(State.holeIdx, key, latlng.lat, latlng.lng);
+    UI.toast(`${key === 'tee' ? 'Tee' : 'Green'} position saved`, 'success', 1500);
+    if (UI.activeTab === 'hole') UI.updatePinDistance();
+  },
+
   // ── Settings ───────────────────────────────────────────────────────────
   renderSettings() {
     this.$('setting-name').value = State.settings.playerName;
@@ -1525,6 +1651,7 @@ const Backup = {
       settings: State.settings,
       clubs: State.clubs,
       clubStats: State.clubStats,
+      courseOverrides: State.courseOverrides,
       rounds: Store.get('rounds', []),
       activeRound: Store.get('activeRound', null)
     }, null, 2);
@@ -1539,6 +1666,7 @@ const Backup = {
     if (data.settings)  { State.settings  = data.settings;  Store.set('settings', data.settings); }
     if (data.clubs)     { State.clubs     = data.clubs;     Store.set('clubs', data.clubs); }
     if (data.clubStats) { State.clubStats = data.clubStats; Store.set('clubStats', data.clubStats); }
+    if (data.courseOverrides) { State.courseOverrides = data.courseOverrides; Store.set('courseOverrides', data.courseOverrides); State.applyCourseOverrides(); }
     if (data.rounds)    Store.set('rounds', data.rounds);
     if (data.activeRound) { Store.set('activeRound', data.activeRound); State.load(); }
     else { Store.del('activeRound'); }
@@ -1824,8 +1952,8 @@ const App = {
     if (!GPS.pos) { UI.toast('No GPS signal', 'error'); return; }
     const hd = State.holeData;
     if (!hd) return;
-    hd.pin = { lat: GPS.pos.lat, lon: GPS.pos.lon };
-    UI.toast(`Pin position updated for Hole ${hd.number}`, 'success');
+    State.setHolePoint(State.holeIdx, 'pin', GPS.pos.lat, GPS.pos.lon);
+    UI.toast(`Pin position saved for Hole ${hd.number}`, 'success');
     UI.updatePinDistance();
   }
 };

@@ -421,6 +421,29 @@ html, body {
 .rf-shoot { min-width: 200px; }
 .rf-close { position: absolute; top: calc(16px + var(--safe-top)); right: 16px; z-index: 20; }
 
+/* ── SATELLITE ─────────────────────────────────── */
+#sat-overlay { position: fixed; inset: 0; background: #000; display: none; z-index: 200; }
+#sat-map { position: absolute; inset: 0; }
+.sat-top {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 1000;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: calc(10px + var(--safe-top)) 12px 10px; background: linear-gradient(#000a, #0000);
+}
+.sat-title { color: #fff; font-weight: 800; font-size: 15px; text-shadow: 0 1px 3px #000; }
+.sat-hint {
+  position: absolute; left: 12px; right: 12px; bottom: calc(16px + var(--safe-bottom)); z-index: 1000;
+  background: rgba(0,0,0,0.66); color: #fff; padding: 9px 12px; border-radius: 10px;
+  font-size: 12px; text-align: center; display: none;
+}
+.sat-msg {
+  position: absolute; inset: 0; z-index: 999; display: none;
+  align-items: center; justify-content: center; text-align: center;
+  color: var(--muted); padding: 32px; font-size: 14px;
+}
+/* dark popups for Leaflet markers */
+.leaflet-container { background: #0a0a0a; }
+.sat-mk { font-size: 11px; font-weight: 800; color: #fff; text-shadow: 0 1px 2px #000; text-align: center; }
+
 /* ── TOAST ────────────────────────────────────── */
 #toast {
   position: fixed; bottom: calc(90px + var(--safe-bot)); left: 50%; transform: translateX(-50%) translateY(20px);
@@ -595,6 +618,7 @@ select option { background: var(--card); }
       </div>
       <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
         <button class="btn btn-primary btn-sm" onclick="UI.openRangefinder()">📷 Rangefinder</button>
+        <button class="btn btn-primary btn-sm" onclick="UI.openSatellite()">🛰 Satellite</button>
         <button class="btn btn-ghost btn-sm" onclick="App.updatePinHere()">📍 Update Pin Here</button>
       </div>
     </div>
@@ -943,6 +967,18 @@ select option { background: var(--card); }
     <div id="rf-bearing">Acquiring GPS…</div>
     <button class="btn btn-accent rf-shoot" onclick="UI.rangefinderShoot()">🎯 Range Target</button>
   </div>
+</div>
+
+<!-- ═══════════════════ SATELLITE ═══════════════════ -->
+<div id="sat-overlay">
+  <div id="sat-map"></div>
+  <div class="sat-top">
+    <button class="btn btn-danger btn-sm" onclick="UI.closeSatellite()">✕ Close</button>
+    <span id="sat-title" class="sat-title">Hole</span>
+    <button class="btn btn-ghost btn-sm" id="sat-edit-btn" onclick="UI.toggleSatEdit()">✎ Edit</button>
+  </div>
+  <div id="sat-hint" class="sat-hint"></div>
+  <div id="sat-msg" class="sat-msg"></div>
 </div>
 
 <!-- ═══════════════════ TOAST ═══════════════════ -->

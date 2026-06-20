@@ -1,5 +1,5 @@
-const CACHE = 'golf-v11';
-const ASSETS = ['./index.html', './app.js', './course-data.js', './manifest.json', './icon-192.png', './icon-512.png'];
+const CACHE = 'golf-v12';
+const ASSETS = ['./index.html', './app.js', './course-data.js', './manifest.json', './icon-192.png', './icon-512.png', './vendor/leaflet/leaflet.js', './vendor/leaflet/leaflet.css'];
 
 self.addEventListener('install', e =>
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()))
