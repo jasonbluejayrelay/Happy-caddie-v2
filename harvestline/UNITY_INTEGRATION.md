@@ -15,19 +15,34 @@ This file explains the mapping and the M2+ work that layers on top.
 
 ## File mapping
 
-Copy the sources under `src/Harvestline.Core/**/*.cs` into your Unity project at:
+The [`unity/`](unity/) folder is a ready Unity `Assets/` skeleton:
 
 ```
-Assets/Scripts/Harvestline.Core/          <- Harvestline.Core.asmdef  (noEngineReferences: true)
-    Model/  Content/  Simulation/  Economy/  Progression/  Save/  Rng/  Samples/
-Assets/Scripts/Harvestline.Unity/         <- Harvestline.Unity.asmdef (references Harvestline.Core)
-    View/ Input/ UI/ Bootstrap/           <- written during M2–M7
-Assets/Scripts/Harvestline.Tests/         <- Harvestline.Tests.asmdef (EditMode, NUnit)
+unity/Assets/
+  Scripts/
+    Harvestline.Core/     <- Harvestline.Core.asmdef (noEngineReferences: true)
+                             copy src/Harvestline.Core/**/*.cs here (see the marker file)
+    Harvestline.Unity/    <- Harvestline.Unity.asmdef (references Harvestline.Core, UnityEngine.UI)
+      View/               MeshFactory, Palette, StructureVisuals, GridRenderer
+      Input/              CameraController, PlacementController
+      UI/                 ForecastPanel, ResumeScreen
+      Bootstrap/          GameBootstrap, SaveIO
+    Harvestline.Tests/    <- Harvestline.Tests.asmdef (EditMode, NUnit)
+  Shaders/
+    HarvestlinePalette.shader
 ```
 
-The three `*.asmdef` templates are in [`unity/`](unity/). The test files under
-`tests/Harvestline.Tests/*.cs` are ordinary NUnit and run as **EditMode** tests in the
-Unity Test Framework with no changes.
+The Core sources live once under `src/Harvestline.Core/` (so they build and test as a
+standalone library) and are copied into `unity/Assets/Scripts/Harvestline.Core/` on
+integration. The `tests/Harvestline.Tests/*.cs` files are ordinary NUnit and run as
+**EditMode** tests in the Unity Test Framework unchanged.
+
+> **Status:** the `Harvestline.Unity` view scripts and the shader are written against
+> the Core API but have **not been compiled inside Unity** in this environment (no
+> Editor available here). Treat M2 as "code-complete, needs an in-Editor compile/scene
+> pass": create a scene with a Camera (+ `CameraController`), an empty `GameBootstrap`
+> object with the serialized references wired, a `Palette` asset, and a material using
+> `Harvestline/Palette`.
 
 > Keep authoring and running the tests here with `dotnet test` during logic work —
 > it's faster than Play Mode and CI-friendly — and let them double as Unity EditMode

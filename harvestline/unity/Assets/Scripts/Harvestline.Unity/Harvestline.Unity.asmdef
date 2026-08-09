@@ -2,7 +2,8 @@
   "name": "Harvestline.Unity",
   "rootNamespace": "Harvestline.Unity",
   "references": [
-    "Harvestline.Core"
+    "Harvestline.Core",
+    "UnityEngine.UI"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

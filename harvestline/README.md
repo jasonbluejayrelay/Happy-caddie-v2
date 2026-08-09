@@ -96,11 +96,11 @@ report** for the game's "Diagnose" loop.
 | Milestone | Scope | Status |
 |---|---|---|
 | **M1** | Simulation core, headless | ✅ implemented, tested, gate passing |
-| M2 | Rendering & placement (Unity) | ⬜ scaffolded (asmdefs, notes) |
-| M3 | Offline accrual & save UI | 🟡 core done (accrual, save, bottleneck report); needs Unity resume screen |
-| M4 | Harvest & notifications | 🟡 resolver/curve/tokens done; needs Unity forecast panel + push |
-| **M5** | Market & contracts | ✅ economy gate passing (headless); needs Unity sell UI |
-| M6 | Prestige & tier 3 | 🟡 resettlement + multiplier + tier-3 recipes done & tested; **balance not yet tuned to target** |
+| M2 | Rendering & placement (Unity) | 🟡 view layer written (procedural meshes, palette shader, instanced renderer, camera, touch placement) — not yet compiled in Unity |
+| M3 | Offline accrual & save UI | 🟡 core done & tested; Unity resume screen + atomic SaveIO written |
+| M4 | Harvest & notifications | 🟡 resolver/curve/tokens done & tested; Unity forecast panel written; push notifications TODO |
+| **M5** | Market & contracts | ✅ economy gate passing (headless); Unity sell UI TODO |
+| **M6** | Prestige & tier 3 | ✅ resettlement + multiplier + tier-3 done & tested; **balance targets met & locked by tests** |
 | M7 | Polish | ⬜ |
 
 ### M5 economy gate — PASSING
@@ -109,21 +109,22 @@ report** for the game's "Diagnose" loop.
 selling. Every commodity stays within ~[0.55, 1.31]× base with averages near 1.0 — no
 runaway inflation, no collapse (verified by `Economy_Is_Stable_Over_30_Days`).
 
-### M6 prestige — mechanics done, balance open
+### M6 prestige & balance — targets met
 
 Resettlement is implemented and tested: the grid/Credits/run-progress wipe, Seals
 persist, the next run starts on a larger grid (per lifetime Seals), and Seals spent on
-the output track apply a permanent yield multiplier the solver honors. The `bot`
-command drives the **entire loop** deterministically and reaches a Resettlement.
+the output track apply a permanent yield multiplier the solver honors.
 
-**The balance is not yet tuned to the spec's target curve** (first Harvest failure
-day 5–7, first Resettlement day 12–20). With the current content the greedy bot never
-fails and first resettles ~day 27. The dominant reason is visible in the `bot` output:
-byproduct **sell income dwarfs build costs**, so a competent player is never
-credit-constrained, and the gentle demand curve (×1.12 / 3 days) never outruns free
-storage expansion on a spacious grid.
+The balance bot was rewritten as a faithful **once-a-day reasonable player** (sells
+surplus, buys just enough storage to clear the next Harvest, climbs the food-value
+ladder, banks the rest, Resettles only on a real Seal haul), and the content was tuned
+so both spec §11 targets are hit and **locked by tests**:
 
-Closing that gap is exactly the iterative co-design the bot exists for (spec §11) and
-touches only `ContentDatabase` data (sell prices/depths, build costs, storage, starting
-purse) plus a more faithful player model — never the solver. It is the remaining **M6
-gate** work.
+- **Diligent player** (`bot 25`): first Resettlement **day 12** (target 12–20), and
+  never loses population — survival and prestige are achievable.
+- **Naive player** (`bot 12 naive`): first Harvest **shortfall day 6** (target 5–7),
+  absorbed by the **Stores grace token** exactly as designed; first population loss
+  day 9 — the intended teaching moment.
+
+All tuning is `ContentDatabase` / bot data — the solver was never touched. The M5
+economy gate stays green throughout.
