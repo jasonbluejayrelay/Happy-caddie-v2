@@ -11,6 +11,7 @@ using Harvestline.Core.Simulation;
 //   run   [hours]       Run the sample bread factory and print resource totals + bottlenecks.
 //   gate                Run the M1 acceptance gate (1000h < 100ms, bit-identical across runs).
 //   bot   [days]        Run the greedy balance bot and print the days-to-milestone table.
+//   market [days]       Run the headless economy stability sim (M5 gate).
 //   save                Round-trip a game through the save serializer and print it.
 
 var db = ContentDatabase.CreateDefault();
@@ -21,8 +22,21 @@ switch (cmd)
     case "run": RunFactory(args.Length > 1 ? double.Parse(args[1], CultureInfo.InvariantCulture) : 100); break;
     case "gate": Gate(); break;
     case "bot": Bot(args.Length > 1 ? int.Parse(args[1], CultureInfo.InvariantCulture) : 30); break;
+    case "market": Economy(args.Length > 1 ? int.Parse(args[1], CultureInfo.InvariantCulture) : 30); break;
     case "save": SaveRoundTrip(); break;
-    default: Console.WriteLine("Unknown command. Use: run | gate | bot | save"); break;
+    default: Console.WriteLine("Unknown command. Use: run | gate | bot | market | save"); break;
+}
+
+void Economy(int days)
+{
+    var report = EconomySimulator.Run(days);
+    Console.WriteLine($"== Economy stability, {days} days ({report.Ticks} ticks) ==");
+    Console.WriteLine($"{"Item",-11} {"min",6} {"avg",6} {"max",6}");
+    foreach (var s in report.Stats)
+        Console.WriteLine($"{s.Item,-11} {s.MinRatio,6:0.00} {s.AvgRatio,6:0.00} {s.MaxRatio,6:0.00}  (× base)");
+    bool stable = report.IsStable();
+    Console.WriteLine($"No runaway inflation or collapse: {(stable ? "PASS" : "FAIL")}");
+    Console.WriteLine(stable ? "M5 ECONOMY GATE: PASS" : "M5 ECONOMY GATE: FAIL");
 }
 
 void RunFactory(double hours)

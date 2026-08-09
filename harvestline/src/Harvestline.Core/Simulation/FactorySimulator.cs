@@ -31,9 +31,9 @@ namespace Harvestline.Core.Simulation
         private readonly SimGraph _graph;
         private readonly RateSolver _solver;
 
-        public FactorySimulator(GridState grid)
+        public FactorySimulator(GridState grid, double outputMultiplier = 1.0)
         {
-            _graph = SimGraph.Build(grid);
+            _graph = SimGraph.Build(grid, outputMultiplier);
             _solver = new RateSolver(_graph);
         }
 

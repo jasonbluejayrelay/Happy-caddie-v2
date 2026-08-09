@@ -47,6 +47,7 @@ namespace Harvestline.Core.Samples
     {
         private readonly ContentDatabase _db;
         private readonly long _startUtc;
+        private double _mult = 1.0; // current prestige output multiplier
 
         // Producer structures the greedy heuristic ranks by food-gain-per-credit.
         private static readonly string[] Buildable =
@@ -68,7 +69,8 @@ namespace Harvestline.Core.Samples
             // grid) plus seed Credits — a lone machine produces no food and no power, so
             // the greedy heuristic needs a running chain to measure marginal gains against.
             SeedStartingEngine(game);
-            game.Colony.Credits = 150;
+            game.Colony.Credits = 40;
+            _mult = game.OutputMultiplier;
             var report = new BotReport();
 
             const double stepSeconds = 6.0 * 3600.0; // simulate in 6h steps; a "session" once/day
@@ -82,7 +84,7 @@ namespace Harvestline.Core.Samples
                     long next = now + (long)stepSeconds;
 
                     // Advance production for this step.
-                    var sim = new FactorySimulator(game.Grid);
+                    var sim = new FactorySimulator(game.Grid, _mult);
                     sim.Simulate(game.Grid.Inventory, stepSeconds);
                     now = next;
                     game.LastSimulatedUtc = now;
@@ -105,14 +107,21 @@ namespace Harvestline.Core.Samples
                 EnsurePower(game);
                 BuildGreedily(game);
 
-                // Prestige check.
-                if (report.FirstResettleDay < 0 &&
-                    PrestigeCalculator.ShouldResettle(game.Colony.Seals, game.Colony.LifetimeSeals))
+                // Prestige: when a Resettlement is worthwhile, spend banked Seals on the
+                // permanent output multiplier, wipe, and restart on a larger grid.
+                long lifetimeAtStart = game.Colony.LifetimeSeals - game.Colony.Seals;
+                if (PrestigeCalculator.ShouldResettle(game.Colony.Seals, lifetimeAtStart))
                 {
-                    report.FirstResettleDay = day;
+                    game.SpendSealsOnOutput(game.Colony.Seals);
+                    game.Resettle();
+                    SeedStartingEngine(game);
+                    game.Colony.Credits = 40;
+                    _mult = game.OutputMultiplier;
+                    if (report.FirstResettleDay < 0) report.FirstResettleDay = day;
+                    note = $"RESETTLE #{game.Colony.Resettlements} (×{_mult:0.00}, edge {game.Grid.Edge})";
                 }
 
-                var simFore = new FactorySimulator(game.Grid);
+                var simFore = new FactorySimulator(game.Grid, _mult);
                 double foodPerHour = simFore.ProjectedFoodPerHour(game.Grid.Inventory);
                 double nextDemand = HarvestResolver.Demand(game.Colony.Population);
                 report.Days.Add(new BotDay(day, game.Colony.Population, game.Colony.Credits,
@@ -170,7 +179,7 @@ namespace Harvestline.Core.Samples
         {
             while (game.Colony.Credits >= _db.BuildCost("biomass_generator"))
             {
-                var sim = new FactorySimulator(game.Grid);
+                var sim = new FactorySimulator(game.Grid, _mult);
                 sim.Simulate(game.Grid.Inventory.Clone(), 60); // one solve to read the power budget
                 var solver = new RateSolver(SimGraph.Build(game.Grid));
                 var inv = game.Grid.Inventory;
@@ -205,7 +214,7 @@ namespace Harvestline.Core.Samples
             while (bought && safety-- > 0)
             {
                 bought = false;
-                double baseFood = new FactorySimulator(game.Grid).ProjectedFoodPerHour(game.Grid.Inventory);
+                double baseFood = new FactorySimulator(game.Grid, _mult).ProjectedFoodPerHour(game.Grid.Inventory);
 
                 string? best = null;
                 double bestGain = 0;
@@ -220,7 +229,7 @@ namespace Harvestline.Core.Samples
 
                     // Trial placement on a scratch grid.
                     var trial = CloneGridWith(game, def, x, y);
-                    double food = new FactorySimulator(trial).ProjectedFoodPerHour(trial.Inventory);
+                    double food = new FactorySimulator(trial, _mult).ProjectedFoodPerHour(trial.Inventory);
                     double gain = (food - baseFood) / cost; // gain per credit
                     if (gain > bestGain)
                     {

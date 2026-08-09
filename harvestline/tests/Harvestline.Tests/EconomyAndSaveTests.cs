@@ -75,6 +75,29 @@ public class EconomyAndSaveTests
     }
 
     [Test]
+    public void Economy_Is_Stable_Over_30_Days()
+    {
+        // M5 gate (spec §10): a headless 30-day economy shows no runaway inflation or
+        // price collapse under steady, depth-proportional player selling.
+        var report = Harvestline.Core.Samples.EconomySimulator.Run(30);
+        Assert.That(report.IsStable(), Is.True);
+        foreach (var s in report.Stats)
+        {
+            Assert.That(s.MinRatio, Is.GreaterThan(0.15), $"{s.Item} collapsed");
+            Assert.That(s.MaxRatio, Is.LessThan(4.0), $"{s.Item} inflated away");
+        }
+    }
+
+    [Test]
+    public void Economy_Is_Deterministic()
+    {
+        var a = Harvestline.Core.Samples.EconomySimulator.Run(30, seed: 7);
+        var b = Harvestline.Core.Samples.EconomySimulator.Run(30, seed: 7);
+        for (int i = 0; i < a.Stats.Count; i++)
+            Assert.That(b.Stats[i].AvgRatio, Is.EqualTo(a.Stats[i].AvgRatio));
+    }
+
+    [Test]
     public void Save_Round_Trips_All_State()
     {
         var db = ContentDatabase.CreateDefault();

@@ -38,7 +38,13 @@ namespace Harvestline.Core.Simulation
 
         private SimGraph(Node[] nodes) { Nodes = nodes; }
 
-        public static SimGraph Build(GridState grid)
+        /// <summary>
+        /// Build the flow graph. <paramref name="outputMultiplier"/> is the permanent
+        /// prestige yield bonus (spec §2): it scales every machine's item output while
+        /// leaving inputs and power draw unchanged — a "+X% output" buff bought with
+        /// Seals. Default 1.0 (no bonus).
+        /// </summary>
+        public static SimGraph Build(GridState grid, double outputMultiplier = 1.0)
         {
             var structures = grid.Structures;
             int n = structures.Count;
@@ -68,7 +74,7 @@ namespace Harvestline.Core.Simulation
                     foreach (var stack in def.Recipe.Inputs)
                         inputs.Add(new Line(stack.Item.Index(), stack.Quantity * cr));
                     foreach (var stack in def.Recipe.Outputs)
-                        outputs.Add(new Line(stack.Item.Index(), stack.Quantity * cr));
+                        outputs.Add(new Line(stack.Item.Index(), stack.Quantity * cr * outputMultiplier));
                     node.PowerDraw = def.PowerDraw;
                 }
 

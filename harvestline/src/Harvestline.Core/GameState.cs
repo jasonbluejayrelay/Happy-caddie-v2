@@ -14,7 +14,7 @@ namespace Harvestline.Core
     public sealed class GameState
     {
         public ContentDatabase Content { get; }
-        public GridState Grid { get; }
+        public GridState Grid { get; private set; }
         public ColonyState Colony { get; }
         public DeterministicRng Rng { get; }
         public MarketSimulator Market { get; }
@@ -45,6 +45,40 @@ namespace Harvestline.Core
             var colony = new ColonyState();
             var market = MarketSimulator.CreateDefault(rng);
             return new GameState(content, grid, colony, rng, market, nowUtc, nowUtc);
+        }
+
+        /// <summary>
+        /// Permanent prestige yield bonus applied to every machine's output, derived
+        /// from Seals spent on the output track (spec §2). Pass to FactorySimulator.
+        /// </summary>
+        public double OutputMultiplier => PrestigeCalculator.GlobalOutputMultiplier(Colony.SealsSpentOnOutput);
+
+        /// <summary>
+        /// Resettlement / prestige (spec §2): the grid, Credits, and run progress wipe;
+        /// Seals (and lifetime Seals / spent Seals) persist. The new grid starts larger
+        /// per lifetime Seals. Population resets to the starting colony size.
+        /// </summary>
+        public void Resettle()
+        {
+            int newEdge = PrestigeCalculator.StartingEdge(Colony.LifetimeSeals);
+            Grid = new GridState(newEdge);
+
+            Colony.Population = 10;
+            Colony.Credits = 0;
+            Colony.StoresTokens = 0;
+            Colony.HarvestsSucceeded = 0;
+            Colony.HarvestsFailed = 0;
+            Colony.Resettlements++;
+            // Seals, LifetimeSeals, SealsSpentOnOutput persist across the wipe.
+        }
+
+        /// <summary>Spend banked Seals on the permanent global output multiplier.</summary>
+        public bool SpendSealsOnOutput(long amount)
+        {
+            if (amount <= 0 || Colony.Seals < amount) return false;
+            Colony.Seals -= amount;
+            Colony.SealsSpentOnOutput += amount;
+            return true;
         }
 
         /// <summary>How many Harvests have fired between two timestamps on the fixed clock.</summary>

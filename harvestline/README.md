@@ -53,7 +53,10 @@ dotnet run --project src/Harvestline.Harness -- gate
 dotnet run --project src/Harvestline.Harness -- run 100
 
 # the "reasonable player" balance bot: days-to-milestone table (§11)
-dotnet run --project src/Harvestline.Harness -- bot 30
+dotnet run --project src/Harvestline.Harness -- bot 40
+
+# the M5 economy gate: 30-day headless market, no inflation/collapse (§10)
+dotnet run --project src/Harvestline.Harness -- market 30
 
 # round-trip a game through the save serializer
 dotnet run --project src/Harvestline.Harness -- save
@@ -96,14 +99,31 @@ report** for the game's "Diagnose" loop.
 | M2 | Rendering & placement (Unity) | ⬜ scaffolded (asmdefs, notes) |
 | M3 | Offline accrual & save UI | 🟡 core done (accrual, save, bottleneck report); needs Unity resume screen |
 | M4 | Harvest & notifications | 🟡 resolver/curve/tokens done; needs Unity forecast panel + push |
-| M5 | Market & contracts | 🟡 price walk + pressure + contracts done; needs sell UI |
-| M6 | Prestige & tier 3 | 🟡 prestige math + tier-3 recipes done; **balance tuning is this gate** |
+| **M5** | Market & contracts | ✅ economy gate passing (headless); needs Unity sell UI |
+| M6 | Prestige & tier 3 | 🟡 resettlement + multiplier + tier-3 recipes done & tested; **balance not yet tuned to target** |
 | M7 | Polish | ⬜ |
 
-### Balance note
+### M5 economy gate — PASSING
 
-The `bot` command runs and reports days-to-milestone deterministically (the M1
-requirement — keep the bot alive from day one). Tuning the content constants so the
-first Harvest failure lands on **day 5–7** and first Resettlement on **day 12–20** is
-the **M6 gate**, not M1. Because all content lives in `ContentDatabase` as data,
-tuning never touches the solver.
+`market 30` runs a deterministic 30-day economy under steady, depth-proportional
+selling. Every commodity stays within ~[0.55, 1.31]× base with averages near 1.0 — no
+runaway inflation, no collapse (verified by `Economy_Is_Stable_Over_30_Days`).
+
+### M6 prestige — mechanics done, balance open
+
+Resettlement is implemented and tested: the grid/Credits/run-progress wipe, Seals
+persist, the next run starts on a larger grid (per lifetime Seals), and Seals spent on
+the output track apply a permanent yield multiplier the solver honors. The `bot`
+command drives the **entire loop** deterministically and reaches a Resettlement.
+
+**The balance is not yet tuned to the spec's target curve** (first Harvest failure
+day 5–7, first Resettlement day 12–20). With the current content the greedy bot never
+fails and first resettles ~day 27. The dominant reason is visible in the `bot` output:
+byproduct **sell income dwarfs build costs**, so a competent player is never
+credit-constrained, and the gentle demand curve (×1.12 / 3 days) never outruns free
+storage expansion on a spacious grid.
+
+Closing that gap is exactly the iterative co-design the bot exists for (spec §11) and
+touches only `ContentDatabase` data (sell prices/depths, build costs, storage, starting
+purse) plus a more faithful player model — never the solver. It is the remaining **M6
+gate** work.

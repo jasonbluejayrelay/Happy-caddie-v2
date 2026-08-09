@@ -19,6 +19,12 @@ namespace Harvestline.Core.Progression
         /// <summary>Lifetime Seals ever earned; drives starting grid/tech scaling.</summary>
         public long LifetimeSeals { get; set; } = 0;
 
+        /// <summary>Seals permanently spent on the global output multiplier (spec §2).</summary>
+        public long SealsSpentOnOutput { get; set; } = 0;
+
+        /// <summary>Number of Resettlements completed.</summary>
+        public int Resettlements { get; set; } = 0;
+
         /// <summary>Grace tokens ("Stores"), banked on success, spent to negate a failure. Max 2.</summary>
         public int StoresTokens { get; set; } = 0;
 
