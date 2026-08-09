@@ -1,0 +1,16 @@
+{
+  "name": "Harvestline.Unity",
+  "rootNamespace": "Harvestline.Unity",
+  "references": [
+    "Harvestline.Core"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Harvestline simulation core.
+
+    Targets netstandard2.1 so the compiled sources drop directly into a Unity
+    (URP, Unity 6 / 2022.3 LTS) project as the Harvestline.Core assembly
+    definition WITHOUT modification. It must NEVER reference UnityEngine.
+
+    See UNITY_INTEGRATION.md for how these files map onto the asmdef layout in
+    the design spec (§8).
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>Harvestline.Core</RootNamespace>
+    <AssemblyName>Harvestline.Core</AssemblyName>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+
+</Project>

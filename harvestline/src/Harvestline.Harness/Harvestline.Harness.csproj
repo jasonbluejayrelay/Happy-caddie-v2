@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Headless console harness: the M1 "run N hours and print totals" tool plus
+       the balance bot and the determinism/perf gate. No Unity involved. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Harvestline.Harness</RootNamespace>
+    <AssemblyName>Harvestline.Harness</AssemblyName>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Harvestline.Core/Harvestline.Core.csproj" />
+  </ItemGroup>
+
+</Project>
