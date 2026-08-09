@@ -18,8 +18,13 @@ namespace Harvestline.Core.Model
         private readonly double[] _stock = new double[ItemTypeExtensions.Count];
         private readonly double[] _capacity = new double[ItemTypeExtensions.Count];
 
-        /// <summary>Base per-item capacity before any silo bonuses.</summary>
-        public const double BaseCapacity = 100.0;
+        /// <summary>
+        /// Base per-item capacity before any silo bonuses. Sized so a starting colony
+        /// (population 10, demand ≈141) clears its first Harvest on bare storage but is
+        /// caught by its second (demand ≈158) unless the player expands — the intended
+        /// day-5–7 teaching moment (spec §11). Balance data, not a spec constant.
+        /// </summary>
+        public const double BaseCapacity = 150.0;
 
         public Inventory()
         {

@@ -90,6 +90,28 @@ public class PrestigeTests
     }
 
     [Test]
+    public void Diligent_Bot_Survives_And_Resettles_In_Target_Window()
+    {
+        // M6 gate (spec §10/§11): a reasonable player reaches first Resettlement in
+        // the 12–20 day window, without ever suffering a population loss.
+        var report = new BalanceBot(_db).Run(25);
+        Assert.That(report.FirstResettleDay, Is.InRange(12, 20));
+        Assert.That(report.FirstFailureDay, Is.EqualTo(-1), "a diligent player should not lose population");
+    }
+
+    [Test]
+    public void Naive_Bot_Is_Caught_By_The_Deadline_In_The_Teaching_Window()
+    {
+        // The day-5–7 teaching moment (spec §11): a new player who neglects storage is
+        // caught by the second Harvest, and the Stores grace token softens the blow.
+        var report = new BalanceBot(_db) { Naive = true }.Run(12);
+        Assert.That(report.FirstShortfallDay, Is.InRange(5, 7),
+            "the deadline should first bite in the day 5–7 window");
+        Assert.That(report.FirstFailureDay, Is.GreaterThan(report.FirstShortfallDay),
+            "the first population loss comes later, after the grace token is spent");
+    }
+
+    [Test]
     public void Bot_Is_Deterministic()
     {
         var a = new BalanceBot(_db).Run(25);

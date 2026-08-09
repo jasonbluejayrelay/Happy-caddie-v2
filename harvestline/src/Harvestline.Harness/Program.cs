@@ -10,7 +10,7 @@ using Harvestline.Core.Simulation;
 // Harvestline M1 headless harness.
 //   run   [hours]       Run the sample bread factory and print resource totals + bottlenecks.
 //   gate                Run the M1 acceptance gate (1000h < 100ms, bit-identical across runs).
-//   bot   [days]        Run the greedy balance bot and print the days-to-milestone table.
+//   bot   [days] [naive] Run the balance bot (diligent by default) and print milestones.
 //   market [days]       Run the headless economy stability sim (M5 gate).
 //   save                Round-trip a game through the save serializer and print it.
 
@@ -111,15 +111,18 @@ string HashRun(double hours)
 
 void Bot(int days)
 {
-    var bot = new BalanceBot(db);
+    bool naive = args.Length > 2 && args[2].ToLowerInvariant() == "naive";
+    var bot = new BalanceBot(db) { Naive = naive };
     var report = bot.Run(days);
+    if (naive) Console.WriteLine("(naive player: builds production but neglects storage/tech)");
     Console.WriteLine($"== Balance bot, {days} days ==");
-    Console.WriteLine($"{"Day",3} {"Pop",5} {"Credits",8} {"Seals",6} {"Food/h",8} {"Demand",8} {"Bldgs",6}  Note");
+    Console.WriteLine($"{"Day",3} {"Pop",5} {"Credits",8} {"Seals",6} {"FoodCap",8} {"Demand",8} {"Bldgs",6}  Note");
     foreach (var d in report.Days)
-        Console.WriteLine($"{d.Day,3} {d.Population,5} {d.Credits,8} {d.Seals,6} {d.FoodPerHour,8:0.0} {d.NextDemand,8:0.0} {d.Structures,6}  {d.Note}");
-    Console.WriteLine($"First Harvest failure: {(report.FirstFailureDay < 0 ? "none" : "day " + report.FirstFailureDay)} (target day 5–7)");
-    Console.WriteLine($"First Resettlement:    {(report.FirstResettleDay < 0 ? "none" : "day " + report.FirstResettleDay)} (target day 12–20)");
-    Console.WriteLine($"Final population {report.FinalPopulation}, seals {report.FinalSeals}");
+        Console.WriteLine($"{d.Day,3} {d.Population,5} {d.Credits,8} {d.Seals,6} {d.FoodCapacity,8:0} {d.NextDemand,8:0} {d.Structures,6}  {d.Note}");
+    Console.WriteLine($"First Harvest shortfall: {(report.FirstShortfallDay < 0 ? "none" : "day " + report.FirstShortfallDay)} (target day 5–7 — the deadline first bites)");
+    Console.WriteLine($"First population loss:   {(report.FirstFailureDay < 0 ? "none" : "day " + report.FirstFailureDay)} (later, after grace tokens are spent)");
+    Console.WriteLine($"First Resettlement:      {(report.FirstResettleDay < 0 ? "none" : "day " + report.FirstResettleDay)} (target day 12–20)");
+    Console.WriteLine($"Final pop {report.FinalPopulation}, seals {report.FinalSeals}, resettlements {report.TotalResettlements}");
 }
 
 void SaveRoundTrip()

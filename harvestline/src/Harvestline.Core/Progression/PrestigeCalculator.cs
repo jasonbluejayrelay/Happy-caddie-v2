@@ -44,12 +44,17 @@ namespace Harvestline.Core.Progression
         public static double GlobalOutputMultiplier(long sealsSpentOnOutput) =>
             1.0 + 0.02 * sealsSpentOnOutput;
 
+        /// <summary>Minimum Seals a first run must bank before Resettlement is worthwhile.</summary>
+        public const long FirstResettleSeals = 20;
+
         /// <summary>
-        /// Whether a Resettlement is worthwhile: only once the player has banked enough
-        /// lifetime Seals that the next run starts meaningfully ahead. Used by the
-        /// balance bot to decide when to prestige.
+        /// Whether a Resettlement is worthwhile: the current run must have banked a real
+        /// haul of Seals — at least <see cref="FirstResettleSeals"/>, and no less than the
+        /// player's prior lifetime total so each run out-earns all previous progress
+        /// before wiping. This prevents the degenerate "reset every couple of harvests"
+        /// loop and makes prestige a milestone, not a reflex. Used by the balance bot.
         /// </summary>
         public static bool ShouldResettle(long currentSeals, long lifetimeSealsAtRunStart) =>
-            currentSeals >= 10 && currentSeals >= lifetimeSealsAtRunStart / 4;
+            currentSeals >= FirstResettleSeals && currentSeals >= lifetimeSealsAtRunStart;
     }
 }

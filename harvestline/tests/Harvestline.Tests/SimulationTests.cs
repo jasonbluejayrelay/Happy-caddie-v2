@@ -33,9 +33,9 @@ public class SimulationTests
         grid.Place(_db.Get("soil_plot"), 0, 0); // grain @ 1 per 3s, no inputs, no power
         var sim = new FactorySimulator(grid);
 
-        // 100 units at cap / (1/3 per s) = 300s to fill, then blocked.
+        // Fills to base capacity, then blocks.
         var report = sim.Simulate(grid.Inventory, 3600);
-        Assert.That(grid.Inventory.Get(ItemType.Grain), Is.EqualTo(100).Within(1e-6));
+        Assert.That(grid.Inventory.Get(ItemType.Grain), Is.EqualTo(Inventory.BaseCapacity).Within(1e-6));
         var e = Entry(report, grid, "soil_plot");
         Assert.That(e.BlockedFraction, Is.GreaterThan(0.8), "soil plot should spend most of the hour blocked");
     }

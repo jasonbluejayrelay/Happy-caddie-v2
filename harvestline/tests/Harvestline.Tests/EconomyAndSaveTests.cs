@@ -121,7 +121,8 @@ public class EconomyAndSaveTests
         Assert.That(r.Colony.Credits, Is.EqualTo(350));
         Assert.That(r.Colony.Seals, Is.EqualTo(9));
         Assert.That(r.Grid.Inventory.Get(ItemType.Bread), Is.EqualTo(42.5).Within(1e-9));
-        Assert.That(r.Grid.Inventory.Capacity(ItemType.Bread), Is.EqualTo(300).Within(1e-9)); // 100 + 200 silo
+        Assert.That(r.Grid.Inventory.Capacity(ItemType.Bread),
+            Is.EqualTo(Inventory.BaseCapacity + 200).Within(1e-9)); // base + 200 silo
         Assert.That(r.Rng.State, Is.EqualTo(game.Rng.State));
         Assert.That(r.LastSimulatedUtc, Is.EqualTo(1_050_000));
         Assert.That(r.Grid.Structures.Count, Is.EqualTo(3));
