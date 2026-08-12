@@ -10,6 +10,13 @@ Target platform is **Android, 3D, Unity + C#** (see the full design spec, §1–
 This directory lives *beside* the existing Happy Caddie golf app and is completely
 independent of it.
 
+## ▶️ Play it / build it
+
+- **Play the loop today (no Unity, no install):** download a playtest build and run one
+  file — see **[PLAY.md](PLAY.md)**. It runs the real simulation core in a terminal.
+- **Build the Android APK (the 3D game):** via GitHub Actions once you add a Unity
+  licence secret — see **[BUILD.md](BUILD.md)**.
+
 ## What's here (Milestone M1 — Simulation core, headless)
 
 M1 is the highest-leverage slice in the spec: the entire simulation as plain,

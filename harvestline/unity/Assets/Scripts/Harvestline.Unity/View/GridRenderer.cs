@@ -17,9 +17,10 @@ namespace Harvestline.Unity.View
     /// </summary>
     public sealed class GridRenderer : MonoBehaviour
     {
-        [SerializeField] private Palette _palette = null!;
-        [SerializeField] private Shader _shader = null!; // Harvestline/Palette
-        [SerializeField] private float _tileSize = 1.0f;
+        // internal so SceneComposer can wire these from code (also serialized for the Inspector).
+        [SerializeField] internal Palette _palette = null!;
+        [SerializeField] internal Shader _shader = null!; // Harvestline/Palette
+        [SerializeField] internal float _tileSize = 1.0f;
 
         private Material _material = null!;
         private Mesh _tileMesh = null!;

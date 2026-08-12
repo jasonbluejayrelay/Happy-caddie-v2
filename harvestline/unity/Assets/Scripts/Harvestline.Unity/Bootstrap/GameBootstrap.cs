@@ -23,25 +23,40 @@ namespace Harvestline.Unity.Bootstrap
     /// </summary>
     public sealed class GameBootstrap : MonoBehaviour
     {
-        [SerializeField] private GridRenderer _gridRenderer = null!;
-        [SerializeField] private CameraController _camera = null!;
-        [SerializeField] private PlacementController _placement = null!;
-        [SerializeField] private ForecastPanel _forecast = null!;
-        [SerializeField] private ResumeScreen _resume = null!;
-        [SerializeField] private float _tileSize = 1.0f;
-        [SerializeField] private float _autosaveSeconds = 15f;
-        [SerializeField] private double _onlineTickSeconds = 0.25;
+        // Public so the scene can be wired either in the Unity Inspector or entirely from
+        // code by SceneComposer (the project ships no hand-authored .unity asset).
+        public GridRenderer _gridRenderer = null!;
+        public CameraController _camera = null!;
+        public PlacementController _placement = null!;
+        public ForecastPanel? _forecast;
+        public ResumeScreen? _resume;
+        public float _tileSize = 1.0f;
+        public float _autosaveSeconds = 15f;
+        public double _onlineTickSeconds = 0.25;
 
         private ContentDatabase _content = null!;
         private GameState _game = null!;
         private FactorySimulator _sim = null!;
         private double _tickAccumulator;
         private float _autosaveTimer;
+        private bool _booted;
+
+        /// <summary>The live game state (null until <see cref="Boot"/> runs). Read-only for HUDs.</summary>
+        public GameState? Game => _game;
+        /// <summary>The current online simulator (rebuilt when the factory changes).</summary>
+        public FactorySimulator? Sim => _sim;
 
         private static long NowUtc() => DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
-        private void Awake()
+        // Start (not Awake) so all dependencies wired this frame — in the Inspector or by
+        // SceneComposer — exist before boot. Idempotent so either path is safe.
+        private void Start() => Boot();
+
+        public void Boot()
         {
+            if (_booted) return;
+            _booted = true;
+
             _content = ContentDatabase.CreateDefault();
             long now = NowUtc();
             _game = SaveIO.LoadOrNew(_content, now, newGameSeed: (ulong)now);
@@ -56,7 +71,7 @@ namespace Harvestline.Unity.Bootstrap
             _camera.Configure(_game.Grid.Edge * _tileSize);
             _placement.Initialize(_game, def => _content.BuildCost(def.Id));
             _placement.OnPlaced = (_, _, _) => OnFactoryChanged();
-            _forecast.Bind(_game, () => _sim);
+            _forecast?.Bind(_game, () => _sim);
         }
 
         /// <summary>
@@ -105,7 +120,7 @@ namespace Harvestline.Unity.Bootstrap
 
             _game.Market.AdvanceBy(elapsed);
             _game.LastSimulatedUtc = now;
-            _resume.Show(summary);
+            _resume?.Show(summary);
         }
 
         private void Update()

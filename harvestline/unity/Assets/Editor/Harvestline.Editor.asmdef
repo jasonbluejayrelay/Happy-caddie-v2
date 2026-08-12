@@ -1,0 +1,19 @@
+{
+  "name": "Harvestline.Editor",
+  "rootNamespace": "Harvestline.Editor",
+  "references": [
+    "Harvestline.Unity",
+    "Harvestline.Core"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

@@ -3,6 +3,9 @@ bin/
 obj/
 *.user
 
+# Published playable binaries (built on demand via tools/publish-playable.sh)
+dist/
+
 # Rider / VS
 .idea/
 .vs/

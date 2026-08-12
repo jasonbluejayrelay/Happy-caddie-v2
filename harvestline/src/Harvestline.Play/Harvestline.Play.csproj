@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Interactive, installable playable of Harvestline running the REAL simulation core.
+    This is the "download it and test the loop today" build (no Unity, no license):
+    it exercises the exact Harvestline.Core the Unity game uses, so the automation-
+    vs-deadline hypothesis (spec §1/§12) can be play-tested on any desktop.
+
+    Publish self-contained single-file binaries with the build script:
+      harvestline/tools/publish-playable.sh
+    (see that script for the exact dotnet publish invocations per platform).
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Harvestline.Play</RootNamespace>
+    <AssemblyName>Harvestline</AssemblyName>
+    <Deterministic>true</Deterministic>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Harvestline.Core/Harvestline.Core.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -14,8 +14,9 @@ namespace Harvestline.Unity.Input
     /// </summary>
     public sealed class PlacementController : MonoBehaviour
     {
-        [SerializeField] private Camera _camera = null!;
-        [SerializeField] private GridRenderer _grid = null!;
+        // internal so SceneComposer can wire these from code (also serialized for the Inspector).
+        [SerializeField] internal Camera _camera = null!;
+        [SerializeField] internal GridRenderer _grid = null!;
         [SerializeField] private float _holdSeconds = 0.4f;
 
         private GameState _game = null!;

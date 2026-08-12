@@ -13,6 +13,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{BF672AEB
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Harvestline.Tests", "tests\Harvestline.Tests\Harvestline.Tests.csproj", "{94D99B3E-0459-4674-9DE6-994B7FAD7A06}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Harvestline.Play", "src\Harvestline.Play\Harvestline.Play.csproj", "{56EAA6AB-8C5A-424D-8223-B6081DF88F12}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -34,10 +36,15 @@ Global
 		{94D99B3E-0459-4674-9DE6-994B7FAD7A06}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{94D99B3E-0459-4674-9DE6-994B7FAD7A06}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{94D99B3E-0459-4674-9DE6-994B7FAD7A06}.Release|Any CPU.Build.0 = Release|Any CPU
+		{56EAA6AB-8C5A-424D-8223-B6081DF88F12}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{56EAA6AB-8C5A-424D-8223-B6081DF88F12}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{56EAA6AB-8C5A-424D-8223-B6081DF88F12}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{56EAA6AB-8C5A-424D-8223-B6081DF88F12}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{F71AFE18-C6B5-4C30-AA96-5D9DE4948E83} = {B4151031-E29C-43EB-88EF-8F7EF32FAB9F}
 		{A36746A1-D423-4B62-9632-6F248CCFEE47} = {B4151031-E29C-43EB-88EF-8F7EF32FAB9F}
 		{94D99B3E-0459-4674-9DE6-994B7FAD7A06} = {BF672AEB-EC7A-4138-B213-1B9AC9785CA7}
+		{56EAA6AB-8C5A-424D-8223-B6081DF88F12} = {B4151031-E29C-43EB-88EF-8F7EF32FAB9F}
 	EndGlobalSection
 EndGlobal
